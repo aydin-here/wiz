@@ -327,6 +327,26 @@ let message = utils.format_message("Wiz")
 echo(message)
 ```
 
+### Standard libraries example
+
+`main.wiz`:
+
+- Http library is for connecting and sending get/post requests to pages
+```wiz
+import http
+
+let response = http.get("https://example.com")
+
+echo(response)
+```
+
+- random library is to get a random integer between two numbers or select one random index in a list
+```wiz
+import random
+
+echo(random.randint(1,5))
+```
+
 ## Implementation notes
 
 - The lexer recognizes keywords, identifiers, numbers, strings, symbols, and newlines.

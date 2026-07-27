@@ -34,6 +34,7 @@ Wiz supports:
 - Indexing: `arr[0]`, `obj["key"]`
 - Member access: `dict.key`, `module.function`, `string.upper()`
 - Built-in standard library functions: `echo`, `get`, `str`, `num`, `bool`, `len`
+- Built-in stdlibs: `http`, `random`, `json`
 - Module imports: `import module` loads `module.wiz` from the same directory
 
 ## Built-in types and methods
