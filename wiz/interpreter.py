@@ -3,6 +3,9 @@ from tokens import TokenType
 from lexer import Lexer
 from parser import Parser
 from runtime import Module
+from stdlib.http import HttpModule
+from stdlib.json import JsonModule
+from stdlib.random import RandomModule
 import os
 
 
@@ -68,6 +71,11 @@ class Interpreter:
                 "split": lambda obj, sep=None: obj.split(sep),
                 "strip": lambda obj, *args: obj.strip(*args),
             },
+        }
+        self.stdlib = {
+            "http": HttpModule(),
+            "json": JsonModule(),
+            "random": RandomModule(),
         }
 
     def visit(self, node):
@@ -199,6 +207,13 @@ class Interpreter:
         obj[index] = value
 
     def visit_ImportStatement(self, node):
+
+        if node.module in self.stdlib:
+            self.scopes[0][node.module] = {
+                "value": self.stdlib[node.module],
+                "mutable": False,
+            }
+            return
 
         filename = os.path.join(
             self.base_path,
@@ -425,7 +440,7 @@ class Interpreter:
 
         obj = self.visit(node.object)
 
-        if isinstance(obj, Module):
+        if hasattr(obj, "functions"):
 
             func = obj.functions.get(node.method)
 
@@ -439,6 +454,9 @@ class Interpreter:
                 for arg in node.arguments
             ]
 
+            if callable(func):
+                return func(*arguments)
+
             scope = {}
 
             for param, value in zip(
@@ -449,7 +467,6 @@ class Interpreter:
                     "value": value,
                     "mutable": True
                 }
-
 
             old_scopes = self.scopes
 
@@ -467,7 +484,6 @@ class Interpreter:
             finally:
                 self.scopes = old_scopes
 
-
         methods = self.methods.get(type(obj))
 
         if methods:
@@ -480,7 +496,6 @@ class Interpreter:
                 ]
 
                 return method(obj, *arguments)
-
 
         raise Exception(
             f"This type has no methods: {type(obj).__name__}"
@@ -553,7 +568,7 @@ class Interpreter:
         obj = self.visit(node.object)
 
         # Module access
-        if isinstance(obj, Module):
+        if hasattr(obj, "get"):
 
             value = obj.get(node.property)
 
