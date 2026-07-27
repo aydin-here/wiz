@@ -1,3 +1,6 @@
+<img width="1254" height="1254" alt="Wiz Logo" src="https://github.com/user-attachments/assets/b08d3085-c609-4752-b567-b2de943afb6b" />
+
+
 # Wiz Programming Language
 
 Wiz is a small, educational programming language implemented in Python. It is built around a simple interpreter pipeline:
