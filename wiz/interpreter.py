@@ -3,9 +3,7 @@ from tokens import TokenType
 from lexer import Lexer
 from parser import Parser
 from runtime import Module
-from stdlib.http import HttpModule
-from stdlib.json import JsonModule
-from stdlib.random import RandomModule
+from stdlib import STDLIB
 import os
 
 
@@ -28,6 +26,7 @@ class Interpreter:
             {}
         ]
         self.functions = {}
+        self.stdlib = STDLIB
         self.modules = {}
         self.base_path = base_path
         self.builtins = {
@@ -71,11 +70,6 @@ class Interpreter:
                 "split": lambda obj, sep=None: obj.split(sep),
                 "strip": lambda obj, *args: obj.strip(*args),
             },
-        }
-        self.stdlib = {
-            "http": HttpModule(),
-            "json": JsonModule(),
-            "random": RandomModule(),
         }
 
     def visit(self, node):
@@ -209,12 +203,17 @@ class Interpreter:
     def visit_ImportStatement(self, node):
 
         if node.module in self.stdlib:
-            self.scopes[0][node.module] = {
-                "value": self.stdlib[node.module],
-                "mutable": False,
-            }
-            return
 
+            if node.module not in self.modules:
+                self.modules[node.module] = self.stdlib[node.module]()
+
+            self.scopes[0][node.module] = {
+                "value": self.modules[node.module],
+                "mutable": False
+            }
+
+            return
+        
         filename = os.path.join(
             self.base_path,
             node.module + ".wiz"
