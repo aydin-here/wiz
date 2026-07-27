@@ -1,4 +1,4 @@
-<img width="1254" height="1254" alt="Wiz Logo" src="https://github.com/user-attachments/assets/b08d3085-c609-4752-b567-b2de943afb6b" />
+<img width="627" height="627" alt="Wiz Logo" src="https://github.com/user-attachments/assets/b08d3085-c609-4752-b567-b2de943afb6b" />
 
 
 # Wiz Programming Language
