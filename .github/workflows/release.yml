@@ -1,4 +1,4 @@
-name: Build & Release
+name: Build & Release Wiz
 
 on:
   push:
@@ -9,7 +9,79 @@ permissions:
   contents: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changed: ${{ steps.version.outputs.changed }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: version
+        shell: bash
+        run: |
+          VERSION=$(python -c "import re; print(re.search(r'VERSION\s*=\s*\"([^\"]+)\"', open('wiz/main.py').read()).group(1))")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check-version
+
+    if: needs.check-version.outputs.changed == 'true'
+
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            exe: wiz-linux
+
+          - os: windows-latest
+            exe: wiz.exe
+
+          - os: macos-latest
+            exe: wiz-macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: pip install pyinstaller
+
+      - name: Build
+        run: |
+          pyinstaller \
+            --onefile \
+            --name "${{ matrix.exe }}" \
+            wiz/main.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.exe }}
+          path: |
+            dist/${{ matrix.exe }}
+            dist/${{ matrix.exe }}.exe
+
   release:
+    needs:
+      - check-version
+      - build
+
+    if: needs.check-version.outputs.changed == 'true'
+
     runs-on: ubuntu-latest
 
     steps:
@@ -17,61 +89,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if main.py changed
-        id: changed
-        run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q "^wiz/main.py$"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Stop if not changed
-        if: steps.changed.outputs.changed != 'true'
-        run: |
-          echo "wiz/main.py not changed."
-          exit 0
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/download-artifact@v4
         with:
-          python-version: "3.13"
+          path: artifacts
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller requests
-
-      - name: Read VERSION
-        id: version
+      - name: Generate Changelog
+        id: changelog
         shell: bash
         run: |
-          VERSION=$(python -c "import re,pathlib;text=pathlib.Path('wiz/main.py').read_text(encoding='utf-8');print(re.search(r'VERSION\s*=\s*\"([^\"]+)\"', text).group(1))")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-      - name: Check release
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          if [ -z "$LAST_TAG" ]; then
+            LOG=$(git log --pretty=format:"- %s")
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            LOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s")
           fi
 
-      - name: Build
-        if: steps.release.outputs.exists == 'false'
-        run: |
-          pyinstaller --onefile --name wiz wiz/main.py
+          {
+            echo "body<<EOF"
+            echo "## What's Changed"
+            echo
+            echo "$LOG"
+            echo
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Create Release
-        if: steps.release.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create \
-            "v${{ steps.version.outputs.version }}" \
-            dist/wiz \
-            --title "Wiz v${{ steps.version.outputs.version }}" \
-            --notes "Automatic release"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: Wiz v${{ needs.check-version.outputs.version }}
+          body: ${{ steps.changelog.outputs.body }}
+          files: |
+            artifacts/**/*
