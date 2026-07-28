@@ -24,13 +24,14 @@ jobs:
       - id: version
         shell: bash
         run: |
-          VERSION=$(python -c "import re; print(re.search(r'VERSION\s*=\s*\"([^\"]+)\"', open('wiz/main.py').read()).group(1))")
+          VERSION=$(python3 -c "import re; print(re.search(r'VERSION\s*=\s*\"([^\"]+)\"', open('wiz/main.py').read()).group(1))")
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+              echo "changed=false" >> $GITHUB_OUTPUT
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+              echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
   build:
@@ -42,13 +43,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            exe: wiz-linux
+            artifact: wiz-linux
 
           - os: windows-latest
-            exe: wiz.exe
+            artifact: wiz-windows.exe
 
           - os: macos-latest
-            exe: wiz-macos
+            artifact: wiz-macos
 
     runs-on: ${{ matrix.os }}
 
@@ -58,22 +59,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+          cache: pip
 
-      - run: pip install pyinstaller
-
-      - name: Build
+      - name: Install dependencies
         run: |
-          pyinstaller \
-            --onefile \
-            --name "${{ matrix.exe }}" \
-            wiz/main.py
+          python -m pip install --upgrade pip
+          pip install pyinstaller
 
-      - uses: actions/upload-artifact@v4
+      - name: Build executable
+        run: pyinstaller --onefile --name "${{ matrix.artifact }}" wiz/main.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.exe }}
-          path: |
-            dist/${{ matrix.exe }}
-            dist/${{ matrix.exe }}.exe
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
 
   release:
     needs:
@@ -89,6 +89,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git tag v${{ needs.check-version.outputs.version }}
+          git push origin v${{ needs.check-version.outputs.version }}
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -97,7 +105,7 @@ jobs:
         id: changelog
         shell: bash
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
           if [ -z "$LAST_TAG" ]; then
             LOG=$(git log --pretty=format:"- %s")
@@ -107,17 +115,17 @@ jobs:
 
           {
             echo "body<<EOF"
-            echo "## What's Changed"
+            echo "## 🚀 What's Changed"
             echo
             echo "$LOG"
             echo
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: softprops/action-gh-release@v2
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-version.outputs.version }}
           name: Wiz v${{ needs.check-version.outputs.version }}
           body: ${{ steps.changelog.outputs.body }}
-          files: |
-            artifacts/**/*
+          files: artifacts/**/*
