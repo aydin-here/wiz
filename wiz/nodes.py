@@ -21,7 +21,15 @@ class Identifier(Node):
 class Block(Node):
     statements: list
 
+@dataclass
+class Argument:
+    name: str | None
+    value: object
 
+@dataclass
+class Parameter:
+    name: str
+    default: Node | None = None
 
 @dataclass
 class String(Node):
@@ -75,18 +83,18 @@ class MethodCallExpression:
 @dataclass
 class CallExpression(Node):
     name: str
-    arguments: list
+    arguments: list[Argument]
 
 @dataclass
 class MemberCallExpression(Node):
     object: object
     function: str
-    arguments: list
+    arguments: list[Argument]
 
 @dataclass
 class FunctionCallExpression:
     function: object
-    arguments: list
+    arguments: list[Argument]
 
 @dataclass
 class MemberExpression:
@@ -125,6 +133,7 @@ class WhileStatement(Node):
 class FunctionStatement(Node):
     name: str
     params: list
+    defaults: dict
     body: Block
 
 @dataclass

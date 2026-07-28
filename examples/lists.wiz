@@ -1,0 +1,15 @@
+var numbers = [
+    10,
+    20,
+    30
+]
+
+numbers.append(40)
+
+echo(numbers)
+
+echo(numbers[0])
+
+numbers[1] = 999
+
+echo(numbers)

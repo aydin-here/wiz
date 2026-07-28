@@ -265,6 +265,16 @@ class Lexer:
                 self.advance()
                 continue
 
+            if char == "/" and self.peek() == "/":
+
+                while (
+                    self.current() is not None
+                    and self.current() != "\n"
+                ):
+                    self.advance()
+
+                continue
+
             if char == "/":
                 tokens.append(self.make_token(TokenType.SLASH))
                 self.advance()

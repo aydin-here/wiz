@@ -1,0 +1,10 @@
+let age = 20
+
+when age >= 18
+{
+    echo("Adult")
+}
+else
+{
+    echo("Child")
+}

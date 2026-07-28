@@ -68,7 +68,35 @@ class Parser:
 
             return expression
 
-        raise Exception("Invalid expression")
+        raise Exception(
+            f"Invalid expression. Token: {token.type}, value: {token.value}"
+        )
+
+    def parse_argument(self):
+
+        if (
+            self.current().type == TokenType.IDENTIFIER
+            and self.peek().type == TokenType.ASSIGN
+        ):
+            name = self.current().value
+
+            self.advance()
+            self.advance()
+
+            value = self.parse_expression()
+
+            return Argument(
+                name=name,
+                value=value
+            )
+
+
+        value = self.parse_expression()
+
+        return Argument(
+            name=None,
+            value=value
+        )
 
     def parse_postfix(self):
 
@@ -88,8 +116,10 @@ class Parser:
 
                     while True:
 
+                        self.skip_newlines()
+
                         arguments.append(
-                            self.parse_expression()
+                            self.parse_argument()
                         )
 
                         self.skip_newlines()
@@ -151,7 +181,7 @@ class Parser:
                         while True:
 
                             arguments.append(
-                                self.parse_expression()
+                                self.parse_argument()
                             )
 
                             self.skip_newlines()
@@ -389,12 +419,13 @@ class Parser:
 
         condition = self.parse_expression()
 
+        self.skip_newlines()
+
         body = self.parse_block()
 
         else_body = None
 
-        while self.current().type == TokenType.NEWLINE:
-            self.advance()
+        self.skip_newlines()
 
         if self.current().type == TokenType.ELSE:
 
@@ -430,6 +461,7 @@ class Parser:
         self.match(TokenType.LPAREN)
 
         params = []
+        defaults = {}
 
         if self.current().type != TokenType.RPAREN:
 
@@ -439,6 +471,10 @@ class Parser:
 
                 params.append(param.value)
 
+                if self.current().type == TokenType.ASSIGN:
+                    self.advance()
+                    defaults[param.value] = self.parse_expression()
+
                 if self.current().type != TokenType.COMMA:
                     break
 
@@ -446,11 +482,14 @@ class Parser:
 
         self.match(TokenType.RPAREN)
 
+        self.skip_newlines()
+
         body = self.parse_block()
 
         return FunctionStatement(
             name=name.value,
             params=params,
+            defaults=defaults,
             body=body
         )
 

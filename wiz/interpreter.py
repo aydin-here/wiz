@@ -271,6 +271,9 @@ class Interpreter:
     def visit_Boolean(self, node):
         return node.value
 
+    def visit_Argument(self, node):
+        return self.visit(node.value)
+
     def visit_Identifier(self, node):
 
         variable = self.find_variable(node.name)
@@ -345,47 +348,114 @@ class Interpreter:
         raise Exception("Unknown comparison operator")
 
     def visit_CallExpression(self, node):
-    
-            # Built-in functions
-            if node.name in self.builtins:
-    
-                arguments = [
-                    self.visit(argument)
-                    for argument in node.arguments
-                ]
-    
-                return self.builtins[node.name](*arguments)
-    
-            # User-defined functions
-            if node.name not in self.functions:
-                raise Exception(
-                    f"Undefined function '{node.name}'"
-                )
-    
-            function = self.functions[node.name]
-    
-            if len(node.arguments) != len(function.params):
-                raise Exception(
-                    f"Function '{node.name}' expects "
-                    f"{len(function.params)} arguments, "
-                    f"got {len(node.arguments)}"
-                )
-    
-            scope = {}
 
-            for param, argument in zip(function.params, node.arguments):
-                scope[param] = {
-                    "value": self.visit(argument),
+        # ---------------- Built-in functions ----------------
+
+        if node.name in self.builtins:
+
+            args = []
+            kwargs = {}
+
+            for argument in node.arguments:
+
+                value = self.visit(argument.value)
+
+                if argument.name is None:
+                    args.append(value)
+                else:
+                    kwargs[argument.name] = value
+
+            return self.builtins[node.name](*args, **kwargs)
+
+        # ---------------- User functions ----------------
+
+        if node.name not in self.functions:
+            raise Exception(
+                f"Undefined function '{node.name}'"
+            )
+
+        function = self.functions[node.name]
+
+        scope = {}
+
+        used = set()
+        positional_index = 0
+
+        for argument in node.arguments:
+
+            value = self.visit(argument.value)
+
+            # ---------- Named argument ----------
+            if argument.name is not None:
+
+                if argument.name not in function.params:
+                    raise Exception(
+                        f"Unknown parameter '{argument.name}'"
+                    )
+
+                if argument.name in used:
+                    raise Exception(
+                        f"Parameter '{argument.name}' already assigned"
+                    )
+
+                scope[argument.name] = {
+                    "value": value,
                     "mutable": True
                 }
 
-            try:
-                return self.visit_Block(function.body, scope)
+                used.add(argument.name)
 
-            except ReturnException as e:
-                return e.value
+            # ---------- Positional argument ----------
+            else:
 
-            return None
+                while (
+                    positional_index < len(function.params)
+                    and function.params[positional_index] in used
+                ):
+                    positional_index += 1
+
+                if positional_index >= len(function.params):
+                    raise Exception(
+                        f"Too many arguments for function '{node.name}'"
+                    )
+
+                param = function.params[positional_index]
+
+                scope[param] = {
+                    "value": value,
+                    "mutable": True
+                }
+
+                used.add(param)
+                positional_index += 1
+
+        # ---------- Missing parameters ----------
+
+        for param in function.params:
+
+            if param in scope:
+                continue
+
+            if param in function.defaults:
+
+                scope[param] = {
+                    "value": self.visit(function.defaults[param]),
+                    "mutable": True
+                }
+
+            else:
+
+                raise Exception(
+                    f"Missing required parameter '{param}'"
+                )
+
+        try:
+            return self.visit_Block(function.body, scope)
+
+        except ReturnException as e:
+            return e.value
+
+        return None
 
     def visit_LogicalExpression(self, node):
     

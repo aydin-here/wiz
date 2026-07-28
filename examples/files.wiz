@@ -1,0 +1,10 @@
+import files
+
+files.write(
+    "hello.txt",
+    "Hello from Wiz!"
+)
+
+echo(
+    files.read("hello.txt")
+)

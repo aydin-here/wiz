@@ -1,0 +1,12 @@
+let user = {
+    "name": "Aydin",
+    "age": 14
+}
+
+echo(user)
+
+echo(user["name"])
+
+user["age"] = 15
+
+echo(user)

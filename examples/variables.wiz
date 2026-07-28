@@ -1,0 +1,9 @@
+let name = "Aydin"
+var age = 14
+
+echo(name)
+echo(age)
+
+age = age + 1
+
+echo(age)

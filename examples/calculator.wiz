@@ -1,0 +1,12 @@
+func add(a, b)
+{
+    return a + b
+}
+
+func square(x)
+{
+    return x * x
+}
+
+echo(add(10, 20))
+echo(square(12))

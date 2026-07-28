@@ -1,3 +1,0 @@
-import random
-
-echo(random.randint(1,5))

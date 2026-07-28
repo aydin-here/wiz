@@ -1,0 +1,7 @@
+func greet(name)
+{
+    echo("Hello")
+    echo(name)
+}
+
+greet("Wiz")

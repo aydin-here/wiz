@@ -1,0 +1,7 @@
+import http
+
+let html = http.get(
+    "https://example.com"
+)
+
+echo(html)
