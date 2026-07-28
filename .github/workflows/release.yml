@@ -1,0 +1,72 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: check
+        run: |
+          if git diff HEAD~1 HEAD -- wiz/main.py | grep -q "VERSION"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: version
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          VERSION=$(python - <<'EOF'
+          import re
+          text = open("wiz/main.py").read()
+          m = re.search(r'VERSION\s*=\s*["'\'']([^"'\'']+)["'\'']', text)
+          print(m.group(1))
+          EOF
+          )
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: |
+          pip install pyinstaller
+
+      - run: |
+          pyinstaller \
+            --onefile \
+            wiz/main.py \
+            --name wiz
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: Wiz ${{ needs.check-version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/wiz
