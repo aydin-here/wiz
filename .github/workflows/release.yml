@@ -9,64 +9,69 @@ permissions:
   contents: write
 
 jobs:
-  check-version:
+  release:
     runs-on: ubuntu-latest
-
-    outputs:
-      changed: ${{ steps.check.outputs.changed }}
-      version: ${{ steps.version.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
-      - id: check
+      - name: Check if main.py changed
+        id: changed
         run: |
-          if git diff HEAD~1 HEAD -- wiz/main.py | grep -q "VERSION"; then
+          if git diff --name-only HEAD~1 HEAD | grep -q "^wiz/main.py$"; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - id: version
-        if: steps.check.outputs.changed == 'true'
+      - name: Stop if not changed
+        if: steps.changed.outputs.changed != 'true'
         run: |
-          VERSION=$(python - <<'EOF'
-          import re
-          text = open("wiz/main.py").read()
-          m = re.search(r'VERSION\s*=\s*["'\'']([^"'\'']+)["'\'']', text)
-          print(m.group(1))
-          EOF
-          )
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "wiz/main.py not changed."
+          exit 0
 
-  build:
-    needs: check-version
-    if: needs.check-version.outputs.changed == 'true'
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
-      - run: |
-          pip install pyinstaller
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller requests
 
-      - run: |
-          pyinstaller \
-            --onefile \
-            wiz/main.py \
-            --name wiz
+      - name: Read VERSION
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(python -c "import re,pathlib;text=pathlib.Path('wiz/main.py').read_text(encoding='utf-8');print(re.search(r'VERSION\s*=\s*\"([^\"]+)\"', text).group(1))")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.check-version.outputs.version }}
-          name: Wiz ${{ needs.check-version.outputs.version }}
-          generate_release_notes: true
-          files: |
-            dist/wiz
+      - name: Check release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.release.outputs.exists == 'false'
+        run: |
+          pyinstaller --onefile --name wiz wiz/main.py
+
+      - name: Create Release
+        if: steps.release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create \
+            "v${{ steps.version.outputs.version }}" \
+            dist/wiz \
+            --title "Wiz v${{ steps.version.outputs.version }}" \
+            --notes "Automatic release"
