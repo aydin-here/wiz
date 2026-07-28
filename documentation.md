@@ -2,371 +2,674 @@
 
 ## Overview
 
-Wiz is a minimal educational programming language written in Python. It is designed to be easy to understand and extend while supporting a small but useful set of programming primitives.
+Wiz is a lightweight interpreted programming language written in Python. It was built as an educational project to demonstrate how a programming language works internally, from lexical analysis and parsing to runtime execution.
 
-Wiz source files use the `.wiz` extension and are executed through the CLI entry point `wiz/main.py`.
+Wiz focuses on simplicity while still supporting modern language features such as functions, named arguments, modules, collections, loops, conditions, and a small standard library.
 
-## Getting started
+Source files use the `.wiz` extension.
 
-From the project root, run:
+---
 
-```bash
-python3 wiz/main.py help
-```
+# Running Wiz
 
-This shows the available commands:
-
-- `run <file.wiz>` — execute a Wiz program
-- `tokens <file.wiz>` — print lexer tokens
-- `ast <file.wiz>` — print parsed AST
-- `version` — show language version
-
-Example:
+Execute programs from the project root:
 
 ```bash
 python3 wiz/main.py run examples/hello.wiz
 ```
 
-## Language syntax
+Show help:
 
-### Files and whitespace
-
-- Wiz source is tokenized line by line.
-- Newlines are meaningful and may separate statements.
-- There is no comment syntax in the current implementation.
-- Only double-quoted strings are supported.
-
-### Literals
-
-Wiz supports:
-
-- numbers: `123`
-- strings: `"hello"`
-- booleans: `true`, `false`
-- lists: `[1, 2, 3]`
-- dictionaries: `{ "key": "value", "age": 30 }`
-
-### Variables
-
-Wiz supports two forms of variable declaration:
-
-- `let x = 10` — declares an immutable variable
-- `var x = 10` — declares a mutable variable
-
-Example:
-
-```wiz
-let name = "Ava"
-var count = 1
-count = count + 1
+```bash
+python3 wiz/main.py help
 ```
 
-Attempting to assign to a `let` variable produces a runtime error.
+Available CLI commands:
 
-### Expressions
-
-#### Arithmetic
-
-- `+` addition
-- `-` subtraction
-- `*` multiplication
-- `/` division
-- `%` modulo
-
-Example:
-
-```wiz
-let total = 5 * (3 + 2)
+```text
+run <file.wiz>       Execute a program
+tokens <file.wiz>    Print lexer tokens
+ast <file.wiz>       Print parsed AST
+version              Show current version
+help                 Show help
 ```
 
-#### Comparison
+---
 
-- `==` equal
-- `!=` not equal
-- `>` greater than
-- `<` less than
-- `>=` greater than or equal
-- `<=` less than or equal
+# Basic Syntax
 
-Example:
+## Comments
+
+Single-line comments begin with `//`.
 
 ```wiz
-let ok = score >= 60
+// This is a comment
+
+let age = 18
 ```
 
-#### Logical operators
+---
 
-- `and`
-- `or`
-- `not`
+## Variables
 
-Example:
+Immutable variable:
 
 ```wiz
-when not active or count == 0 {
-    echo("inactive")
+let name = "Aydin"
+```
+
+Mutable variable:
+
+```wiz
+var counter = 0
+counter = counter + 1
+```
+
+Attempting to modify a `let` variable raises a runtime error.
+
+---
+
+# Data Types
+
+Wiz currently supports:
+
+## Numbers
+
+```wiz
+123
+```
+
+## Strings
+
+```wiz
+"Hello"
+```
+
+## Booleans
+
+```wiz
+true
+false
+```
+
+## Lists
+
+```wiz
+[1, 2, 3]
+```
+
+## Dictionaries
+
+```wiz
+{
+    "name": "Aydin",
+    "age": 18
 }
 ```
 
-#### Grouping
+---
 
-Parentheses can group expressions:
+# Operators
 
-```wiz
-let value = (a + b) * c
+## Arithmetic
+
+```text
++
+-
+*
+/
+%
 ```
-
-#### Identifiers
-
-Identifiers are names for variables, functions, and modules. They may contain letters, digits, and underscores but must start with a letter or underscore.
-
-### Indexing
-
-Lists and dictionaries support indexing with square brackets:
-
-```wiz
-let list = [10, 20, 30]
-echo(list[1])
-
-let obj = { "name": "Wiz" }
-echo(obj["name"])
-```
-
-### Member access and method calls
-
-Wiz supports the dot operator for member access and methods.
-
-- `obj.key` accesses a dictionary entry or module member
-- `obj.method(args)` calls methods on built-in objects or module functions
-
-Built-in methods currently supported:
-
-- `list.append(value)`
-- `list.pop(index?)`
-- `list.sort()`
-- `list.reverse()`
-- `list.remove(value)`
-- `list.insert(index, value)`
-- `list.copy()`
-- `list.clear()`
-- `list.extend(other)`
-- `list.count(value)`
-- `list.index(value)`
-- `dict.get(key)`
-- `dict.keys()`
-- `dict.values()`
-- `dict.items()`
-- `dict.pop(key)`
-- `dict.clear()`
-- `dict.update(other)`
-- `dict.copy()`
-- `str.upper()`
-- `str.lower()`
-- `str.replace(a, b)`
-- `str.split(sep?)`
-- `str.strip()`
 
 Example:
 
 ```wiz
-let text = "Hello"
-echo(text.upper())
-
-let data = { "name": "Ava" }
-echo(data.name)
+let result = 5 * (3 + 2)
 ```
 
-### Function calls
+---
 
-Functions and built-in routines are invoked with parentheses:
+## Comparison
 
-```wiz
-echo("Hello")
-let count = len([1, 2, 3])
+```text
+==
+!=
+>
+<
+>=
+<=
 ```
 
-### Built-in functions
-
-Wiz includes these built-in functions:
-
-- `echo(value)` — print a value to standard output
-- `get()` — read a line from standard input
-- `str(value)` — convert to string
-- `num(value)` — convert to integer
-- `bool(value)` — convert to boolean
-- `len(value)` — get length of list, string, or dictionary
-
-## Statements
-
-### Conditional branching
-
-Wiz uses `when` and optional `else` blocks:
+Example:
 
 ```wiz
-when count > 0 {
-    echo("positive")
+when age >= 18 {
+    echo("Adult")
+}
+```
+
+---
+
+## Logical
+
+```text
+and
+or
+not
+```
+
+Example:
+
+```wiz
+when logged_in and admin {
+    echo("Welcome")
+}
+```
+
+---
+
+# Conditions
+
+```wiz
+when score >= 60 {
+    echo("Passed")
 }
 else {
-    echo("zero or negative")
+    echo("Failed")
 }
 ```
 
-### Loops
+---
 
-A `while` loop repeats while the condition is true:
+# Loops
 
 ```wiz
 var i = 0
+
 while i < 5 {
+
     echo(i)
+
     i = i + 1
 }
 ```
 
-Inside loops, you may use:
+Supported loop controls:
 
-- `break` — exit the loop early
-- `continue` — skip to the next iteration
+```wiz
+break
+continue
+```
 
-### Functions
+---
 
-Define functions with `func` and return values with `return`:
+# Functions
+
+Simple function:
+
+```wiz
+func hello(name) {
+    echo(name)
+}
+
+hello("Aydin")
+```
+
+Returning values:
 
 ```wiz
 func add(a, b) {
     return a + b
 }
 
-let result = add(2, 3)
-echo(result)
+echo(add(5, 7))
 ```
 
-If a function does not explicitly return a value, it returns `None`.
+---
 
-### Importing modules
+# Default Parameters
 
-Use `import` to load another `.wiz` file from the same directory.
+Parameters may have default values.
+
+```wiz
+func greet(name, age = 18) {
+
+    echo(name)
+    echo(age)
+}
+
+greet("Aydin")
+```
+
+Output:
+
+```text
+Aydin
+18
+```
+
+---
+
+# Named Arguments
+
+Arguments may be passed by name.
+
+```wiz
+func hello(name, age) {
+
+    echo(name)
+    echo(age)
+}
+
+hello(
+    age = 18,
+    name = "Aydin"
+)
+```
+
+Named arguments may appear in any order.
+
+Mixing positional and named arguments is also supported.
+
+```wiz
+hello(
+    "Aydin",
+    age = 18
+)
+```
+
+Rules:
+
+* Unknown parameter names produce an error.
+* Missing required parameters produce an error.
+* Parameters cannot be assigned twice.
+* Positional arguments automatically fill the next available parameter.
+
+---
+
+# Built-in Functions
+
+## echo
+
+Print a value.
+
+```wiz
+echo("Hello")
+```
+
+Supports keyword arguments because it wraps Python's `print()`.
+
+```wiz
+echo("Hello", end = "")
+echo("World")
+```
+
+---
+
+## get
+
+Read input.
+
+```wiz
+let name = get("Name: ")
+```
+
+---
+
+## len
+
+```wiz
+echo(len([1,2,3]))
+```
+
+---
+
+## str
+
+```wiz
+echo(str(123))
+```
+
+---
+
+## num
+
+```wiz
+echo(num("42"))
+```
+
+---
+
+## bool
+
+```wiz
+echo(bool(1))
+```
+
+---
+
+# Lists
+
+```wiz
+let items = [1,2,3]
+```
+
+Indexing:
+
+```wiz
+echo(items[0])
+```
+
+Assignment:
+
+```wiz
+items[0] = 10
+```
+
+Supported methods:
+
+```text
+append
+pop
+sort
+reverse
+remove
+insert
+copy
+clear
+extend
+count
+index
+```
+
+Example:
+
+```wiz
+items.append(5)
+items.sort()
+```
+
+---
+
+# Dictionaries
+
+```wiz
+let person = {
+    "name": "Aydin",
+    "age": 18
+}
+```
+
+Index access:
+
+```wiz
+echo(person["name"])
+```
+
+Member access:
+
+```wiz
+echo(person.name)
+```
+
+Methods:
+
+```text
+get
+keys
+values
+items
+pop
+clear
+update
+copy
+```
+
+---
+
+# Strings
+
+Methods:
+
+```text
+upper
+lower
+replace
+split
+strip
+```
+
+Example:
+
+```wiz
+let text = "hello"
+
+echo(text.upper())
+```
+
+---
+
+# Modules
+
+Import another Wiz file:
 
 ```wiz
 import utils
-let message = utils.format_message("Wiz")
-echo(message)
 ```
 
-The imported module is available as a namespace object. Its variables and functions are accessed by dot notation.
-
-## Scope and mutability
-
-- Variables declared with `let` are immutable.
-- Variables declared with `var` are mutable.
-- Each block and function call creates a new local scope.
-- Function calls also capture the surrounding function definitions.
-
-## Example programs
-
-### Hello world
+Call module functions:
 
 ```wiz
-echo("Hello, Wiz!")
+utils.say_hello()
 ```
 
-### Counter loop
+Access module variables:
 
 ```wiz
-var count = 1
-while count <= 5 {
-    echo("Count: " + str(count))
-    count = count + 1
-}
+echo(utils.VERSION)
 ```
 
-### Recursive factorial
+Modules are loaded only once during execution.
+
+---
+
+# Standard Library
+
+## files
 
 ```wiz
-func factorial(n) {
-    when n == 0 {
-        return 1
-    }
-    return n * factorial(n - 1)
-}
+import files
 
-let result = factorial(5)
-echo(result)
+let content = files.read("test.txt")
+
+echo(content)
+
+files.write("out.txt", "Hello")
+
+files.append("out.txt", " World")
 ```
 
-### Working with collections
+---
+
+## json
 
 ```wiz
-let numbers = [5, 2, 9, 1]
-numbers.sort()
-echo(numbers)
+import json
 
-echo(numbers[0])
+let text = json.encode({
+    "name": "Aydin"
+})
 
-echo(len(numbers))
-
-let settings = { "debug": true, "theme": "dark" }
-echo(settings.debug)
+echo(text)
 ```
 
-### Module example
+---
 
-`utils.wiz`:
+## random
 
-```wiz
-func format_message(name) {
-    return "Hello, " + name
-}
-```
-
-`main.wiz`:
-
-```wiz
-import utils
-let message = utils.format_message("Wiz")
-echo(message)
-```
-
-### Standard libraries example
-
-`main.wiz`:
-
-- Http library is for connecting and sending get/post requests to pages
-```wiz
-import http
-
-let response = http.get("https://example.com")
-
-echo(response)
-```
-
-- random library is to get a random integer between two numbers or select one random index in a list
 ```wiz
 import random
 
-echo(random.randint(1,5))
+echo(random.randint(1,10))
 ```
 
-## Implementation notes
+---
 
-- The lexer recognizes keywords, identifiers, numbers, strings, symbols, and newlines.
-- The parser supports expressions, statements, blocks, function definitions, and module imports.
-- The interpreter executes the AST and maintains a stack of scopes.
-- Built-in methods are implemented for Python `list`, `dict`, and `str` values.
+## http
 
-## Limitations
+```wiz
+import http
 
-- There is no comment syntax yet.
-- Error messages are runtime exceptions and may not show source locations.
-- There is no support for floating-point numbers.
-- Only `true` and `false` are supported boolean literals.
+let page = http.get("https://example.com")
 
-## Extending Wiz
+echo(page)
+```
 
-Useful extension points:
+---
 
-- add comments and improved parser diagnostics
-- support additional operators and data types
-- add string interpolation or formatted output
-- support modules from nested directories
-- add a standard library of utility functions
+# Collections
+
+Lists:
+
+```wiz
+let numbers = [5,2,9]
+
+numbers.sort()
+
+echo(numbers)
+```
+
+Dictionary:
+
+```wiz
+let config = {
+    "debug": true
+}
+
+echo(config.debug)
+```
+
+---
+
+# Example
+
+```wiz
+import random
+
+func hello(name, age = 18)
+{
+    echo(name, end=" ")
+    echo(age)
+}
+
+let user = "Aydin"
+
+hello(user)
+
+when random.randint(1,10) > 5 {
+
+    echo("Lucky!")
+}
+else {
+
+    echo("Try again!")
+}
+```
+
+---
+
+# Runtime Errors
+
+The interpreter reports descriptive runtime errors, including:
+
+* Undefined variable
+* Undefined function
+* Unknown parameter
+* Missing required parameter
+* Too many arguments
+* Immutable variable modification
+* Invalid index
+* Missing dictionary key
+* Unsupported method
+* Module not found
+
+---
+
+# Project Architecture
+
+```text
+wiz/
+├── lexer.py
+├── parser.py
+├── interpreter.py
+├── nodes.py
+├── tokens.py
+├── runtime.py
+├── main.py
+└── stdlib/
+    ├── files.py
+    ├── http.py
+    ├── json.py
+    ├── random.py
+    └── __init__.py
+
+examples/
+├── calculator.wiz
+├── conditions.wiz
+├── dictionaries.wiz
+├── files.wiz
+├── functions.wiz
+├── hello.wiz
+├── lists.wiz
+├── modules.wiz
+├── named_arguments.wiz
+├── variables.wiz
+└── while.wiz
+```
+
+---
+
+# Current Features
+
+* Variables (`let`, `var`)
+* Numbers
+* Strings
+* Booleans
+* Lists
+* Dictionaries
+* Arithmetic operators
+* Comparison operators
+* Logical operators
+* `when / else`
+* `while`
+* `break`
+* `continue`
+* Functions
+* Recursion
+* Default parameters
+* Named arguments
+* Module imports
+* Member access
+* Collection methods
+* Standard library (`files`, `http`, `json`, `random`)
+* Comments (`//`)
+* AST printer
+* Token printer
+* CLI interface
+
+---
+
+# Planned Features
+
+Future versions may include:
+
+* Floating-point numbers
+* Classes
+* Enums
+* Match expressions
+* Lambdas
+* Package manager
+* Bytecode compiler
+* Native executable compilation
+* Better error diagnostics
+* VS Code Language Server

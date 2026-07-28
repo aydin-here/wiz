@@ -1,144 +1,540 @@
-<img width="313" height="313" alt="Wiz Logo" src="https://github.com/user-attachments/assets/b08d3085-c609-4752-b567-b2de943afb6b" />
+# <p align="center"><img src="https://github.com/user-attachments/assets/b08d3085-c609-4752-b567-b2de943afb6b" width="220"></p>
 
+<h1 align="center">Wiz Programming Language</h1>
 
-# Wiz Programming Language
+<p align="center">
+  <strong>A small, educational programming language written in Python.</strong><br>
+  Designed to make interpreter and programming language development easy to understand.
+</p>
 
-Wiz is a small, educational programming language implemented in Python. It is built around a simple interpreter pipeline:
+<p align="center">
+  <img src="https://img.shields.io/github/v/tag/aydin-here/wiz?label=version&sort=semver">
+  <img src="https://img.shields.io/github/license/aydin-here/wiz">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue">
+  <img src="https://img.shields.io/github/actions/workflow/status/aydin-here/wiz/release.yml?branch=main">
+  <img src="https://img.shields.io/github/downloads/aydin-here/wiz/total">
+  <img src="https://img.shields.io/github/stars/aydin-here/wiz?style=social">
+</p>
 
-- `lexer.py` converts source text into tokens
-- `parser.py` builds an abstract syntax tree (AST)
-- `interpreter.py` executes the AST
+---
 
-The language is intentionally compact so learners can study interpreter design, language features, and runtime behavior without being overwhelmed.
+# About
 
-## Version
+Wiz is a lightweight interpreted programming language implemented entirely in Python.
 
-Current version: `0.8.4`
+The goal of the project is **education**, not performance.
 
-## Language features
+Instead of hiding language internals behind complicated code, Wiz keeps every component readable and easy to extend so anyone can learn how programming languages actually work.
 
-Wiz supports:
+The project contains:
 
-- Immutable and mutable variables with `let` and `var`
-- Literal values: numbers, strings, booleans
-- Arithmetic operators: `+`, `-`, `*`, `/`, `%`
-- Comparison operators: `==`, `!=`, `>=`, `<=`, `>`, `<`
-- Logical operators: `and`, `or`, `not`
-- Conditionals: `when <condition> { ... } else { ... }`
-- Loops: `while <condition> { ... }`
-- `break` and `continue`
-- Functions with `func name(params) { ... }` and `return`
-- First-class function values and function calls
-- Lists: `[a, b, c]`
-- Dictionaries: `{ key: value, ... }`
-- Indexing: `arr[0]`, `obj["key"]`
-- Member access: `dict.key`, `module.function`, `string.upper()`
-- Built-in standard library functions: `echo`, `get`, `str`, `num`, `bool`, `len`
-- Built-in stdlibs: `http`, `random`, `json`
-- Module imports: `import module` loads `module.wiz` from the same directory
+* Lexer
+* Parser
+* AST
+* Tree-walking Interpreter
+* Runtime
+* Module System
+* Standard Library
+* VSCode Extension
+* Automatic Releases
 
-## Built-in types and methods
+Everything is written in pure Python.
 
-Wiz supports these built-in runtime types and methods:
+---
 
-- `list`
-  - `append`, `pop`, `sort`, `reverse`, `remove`, `insert`, `copy`, `clear`, `extend`, `count`, `index`
-- `dict`
-  - `get`, `keys`, `values`, `items`, `pop`, `clear`, `update`, `copy`
-- `str`
-  - `upper`, `lower`, `replace`, `split`, `strip`
+# Features
 
-## CLI commands
+Current language features include:
 
-Run the interpreter from the project root:
+## Variables
 
-```bash
-python3 wiz/main.py help
-```
-
-Available commands:
-
-```bash
-python3 wiz/main.py run <file.wiz>
-python3 wiz/main.py tokens <file.wiz>
-python3 wiz/main.py ast <file.wiz>
-python3 wiz/main.py version
-```
-
-## Example programs
-
-### Conditional example
+* Immutable variables (`let`)
+* Mutable variables (`var`)
+* Assignment
 
 ```wiz
-let age = 20
+let pi = 3.14
 
-when age >= 18 {
+var counter = 0
+
+counter = counter + 1
+```
+
+---
+
+## Data Types
+
+* Number
+* String
+* Boolean
+* List
+* Dictionary
+
+```wiz
+let number = 15
+let text = "Hello"
+let flag = true
+
+let list = [1,2,3]
+
+let person = {
+    "name": "Aydin",
+    "age": 14
+}
+```
+
+---
+
+## Operators
+
+Arithmetic
+
+```
++
+-
+*
+/
+%
+```
+
+Comparison
+
+```
+==
+!=
+>
+<
+>=
+<=
+```
+
+Logical
+
+```
+and
+or
+not
+```
+
+---
+
+## Conditions
+
+```wiz
+when age >= 18
+{
     echo("Adult")
 }
-else {
+else
+{
     echo("Child")
 }
 ```
 
-### Function and loop example
+---
+
+## While Loops
 
 ```wiz
-func factorial(n) {
-    when n == 0 {
-        return 1
-    }
+var i = 0
 
-    return n * factorial(n - 1)
+while i < 5
+{
+    echo(i)
+    i = i + 1
+}
+```
+
+Supports
+
+* break
+* continue
+
+---
+
+## Functions
+
+```wiz
+func hello(name)
+{
+    echo(name)
 }
 
-let result = factorial(5)
-echo(result)
+hello("Aydin")
 ```
 
-### List and dictionary example
+Supports
+
+* return
+* recursion
+* named arguments
+* positional arguments
+* default values
+
+Example
 
 ```wiz
-let items = [1, 2, 3, 4]
-items.append(5)
+func hello(name, age=18)
+{
+    echo(name)
+    echo(age)
+}
 
-let person = { "name": "Ava", "age": 25 }
-echo(person.name)
-echo(items[2])
-echo(len(items))
+hello("Aydin")
+
+hello(
+    age=20,
+    name="John"
+)
 ```
 
-### Module import example
+Mixed arguments are also supported.
+
+---
+
+## Comments
+
+```wiz
+// This is a comment
+```
+
+---
+
+## Lists
+
+```wiz
+let numbers = [1,2,3]
+
+numbers.append(4)
+
+echo(numbers)
+```
+
+Built-in methods
+
+* append
+* pop
+* insert
+* remove
+* clear
+* reverse
+* sort
+* copy
+* extend
+* count
+* index
+
+---
+
+## Dictionaries
+
+```wiz
+let person = {
+    "name":"Aydin",
+    "age":14
+}
+
+echo(person.name)
+
+echo(person["age"])
+```
+
+Built-in methods
+
+* get
+* keys
+* values
+* items
+* pop
+* update
+* copy
+* clear
+
+---
+
+## Strings
+
+Supported methods
+
+* upper
+* lower
+* replace
+* split
+* strip
+
+```wiz
+let name = "wiz"
+
+echo(name.upper())
+```
+
+---
+
+## Standard Library
+
+Currently available modules
+
+### files
+
+```wiz
+import files
+
+let text = files.read("hello.txt")
+```
+
+---
+
+### json
+
+```wiz
+import json
+```
+
+---
+
+### random
+
+```wiz
+import random
+```
+
+---
+
+### http
+
+```wiz
+import http
+```
+
+---
+
+## Imports
 
 ```wiz
 import utils
 
-let greeting = utils.format_message("Wiz")
-echo(greeting)
+utils.sayHello()
 ```
 
-## Project structure
+Modules are loaded from
+
+```
+module.wiz
+```
+
+inside the current project.
+
+---
+
+# Built-in Functions
+
+```
+echo()
+get()
+
+str()
+num()
+bool()
+
+len()
+```
+
+---
+
+# Command Line
+
+Show help
+
+```bash
+python wiz/main.py help
+```
+
+Run a program
+
+```bash
+python wiz/main.py run hello.wiz
+```
+
+Print tokens
+
+```bash
+python wiz/main.py tokens hello.wiz
+```
+
+Print AST
+
+```bash
+python wiz/main.py ast hello.wiz
+```
+
+Version
+
+```bash
+python wiz/main.py version
+```
+
+---
+
+# Example Programs
+
+The repository contains ready-to-run examples.
+
+```
+examples/
+├── calculator.wiz
+├── conditions.wiz
+├── dictionaries.wiz
+├── files.wiz
+├── functions.wiz
+├── hello.wiz
+├── lists.wiz
+├── modules.wiz
+├── named_arguments.wiz
+├── variables.wiz
+└── while.wiz
+```
+
+Run any example
+
+```bash
+python wiz/main.py run examples/hello.wiz
+```
+
+---
+
+# Project Structure
 
 ```text
-wiz/
-  interpreter.py   # Executes the parsed program
-  lexer.py         # Converts source code into tokens
-  main.py          # CLI entry point
-  nodes.py         # AST node definitions
-  parser.py        # Builds the AST from tokens
-  runtime.py       # Module runtime support
-  tokens.py        # Token and token-type definitions
-examples/
-  (empty)
+.
+├── documentation.md
+├── examples
+│   ├── calculator.wiz
+│   ├── conditions.wiz
+│   ├── dictionaries.wiz
+│   ├── files.wiz
+│   ├── functions.wiz
+│   ├── hello.wiz
+│   ├── lists.wiz
+│   ├── modules.wiz
+│   ├── named_arguments.wiz
+│   ├── variables.wiz
+│   └── while.wiz
+├── .github
+│   └── workflows
+│       └── release.yml
+├── LICENSE
+├── README.md
+└── wiz
+    ├── interpreter.py
+    ├── lexer.py
+    ├── main.py
+    ├── nodes.py
+    ├── parser.py
+    ├── runtime.py
+    ├── tokens.py
+    └── stdlib
+        ├── files.py
+        ├── http.py
+        ├── json.py
+        ├── random.py
+        └── __init__.py
 ```
 
-## Contributing and extending Wiz
+---
 
-Wiz is designed for experimentation and learning. Good places to extend the language include:
+# VSCode Extension
 
-- New keywords and syntax
-- Additional expression and statement forms
-- Standard library functions
-- Error reporting and diagnostics
-- A richer module system
+A dedicated Visual Studio Code extension is available.
 
-If you want to contribute, start by exploring `wiz/parser.py`, `wiz/interpreter.py`, and `wiz/lexer.py`.
+Features
+
+* Syntax Highlighting
+* Comments
+* Keywords
+* Functions
+* Numbers
+* Strings
+* Operators
+
+Install
+
+```
+wiz-*.vsix
+```
+
+or install it directly from the Marketplace once published.
+
+---
+
+# Building
+
+Create a standalone executable
+
+```bash
+pyinstaller \
+    --onefile \
+    --name wiz \
+    wiz/main.py
+```
+
+---
+
+# Documentation
+
+More implementation details are available in
+
+```
+documentation.md
+```
+
+---
+
+# Roadmap
+
+Planned features
+
+* Classes
+* Interfaces
+* Enums
+* Pattern Matching
+* Lambda Expressions
+* Switch Statement
+* For Loops
+* Package Manager
+* Bytecode Compiler
+* Virtual Machine
+* Language Server (LSP)
+* Debugger
+* REPL
+* Official Formatter
+* Package Registry
+
+---
+
+# Contributing
+
+Contributions are welcome.
+
+Possible areas to improve
+
+* Parser
+* Interpreter
+* Error reporting
+* Standard Library
+* Optimizations
+* Documentation
+* VSCode Extension
+
+---
+
+# License
+
+This project is licensed under the MIT License.
+
+See the **LICENSE** file for details.
+
+---
+
+<p align="center">
+Made with ❤️ using Python.
+</p>

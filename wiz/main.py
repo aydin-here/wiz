@@ -3,8 +3,9 @@ import os
 from lexer import Lexer
 from parser import Parser
 from interpreter import Interpreter
+from errors import WizError
 
-VERSION = "0.10.6"
+VERSION = "0.11.6"
 BANNER = """__        ___     
 \ \      / (_)____
  \ \ /\ / /| |_  /
@@ -57,7 +58,13 @@ def run(filename):
     tree = parser.parse()
 
     interpreter = Interpreter(os.path.dirname(filename))
-    interpreter.visit(tree)
+    try:
+        interpreter.visit(tree)
+    except WizError as e:
+        print(e)
+    except Exception as e:
+        print("Internal Wiz Error")
+        print(e)
 
 
 def print_tokens(filename):

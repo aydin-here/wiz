@@ -1,5 +1,6 @@
 from tokens import TokenType
 from nodes import *
+from errors import WizSyntaxError
 
 
 class Parser:
@@ -24,8 +25,10 @@ class Parser:
         token = self.current()
 
         if token.type != token_type:
-            raise Exception(
-                f"Expected {token_type}, got {token.type}"
+            raise WizSyntaxError(
+                f"Expected {token_type}, got {token.type}",
+                token.line,
+                token.column
             )
 
         self.advance()
@@ -38,15 +41,15 @@ class Parser:
 
         if token.type == TokenType.STRING:
             self.advance()
-            return String(token.value)
+            return String(line=token.line, column=token.column, value=token.value)
 
         if token.type == TokenType.NUMBER:
             self.advance()
-            return Number(token.value)
+            return Number(line=token.line, column=token.column, value=token.value)
 
         if token.type == TokenType.BOOLEAN:
             self.advance()
-            return Boolean(token.value)
+            return Boolean(line=token.line, column=token.column, value=token.value)
 
         if token.type == TokenType.LBRACKET:
             return self.parse_list()
@@ -56,7 +59,7 @@ class Parser:
 
         if token.type == TokenType.IDENTIFIER:
             self.advance()
-            return Identifier(token.value)
+            return Identifier(line=token.line, column=token.column, name=token.value)
         
 
         if token.type == TokenType.LPAREN:
@@ -68,8 +71,10 @@ class Parser:
 
             return expression
 
-        raise Exception(
-            f"Invalid expression. Token: {token.type}, value: {token.value}"
+        raise WizSyntaxError(
+            f"Invalid expression.",
+            token.line,
+            token.column
         )
 
     def parse_argument(self):
@@ -86,6 +91,8 @@ class Parser:
             value = self.parse_expression()
 
             return Argument(
+                line=self.current().line,
+                column=self.current().column,
                 name=name,
                 value=value
             )
@@ -94,6 +101,8 @@ class Parser:
         value = self.parse_expression()
 
         return Argument(
+            line=self.current().line,
+            column=self.current().column,
             name=None,
             value=value
         )
@@ -135,6 +144,8 @@ class Parser:
                 if isinstance(expression, Identifier):
 
                     expression = CallExpression(
+                        line=self.current().line,
+                        column=self.current().column,
                         name=expression.name,
                         arguments=arguments
                     )
@@ -142,6 +153,8 @@ class Parser:
                 else:
 
                     expression = FunctionCallExpression(
+                        line=self.current().line,
+                        column=self.current().column,
                         function=expression,
                         arguments=arguments
                     )
@@ -156,6 +169,8 @@ class Parser:
                 self.match(TokenType.RBRACKET)
 
                 expression = IndexExpression(
+                    line=self.current().line,
+                    column=self.current().column,
                     object=expression,
                     index=index
                 )
@@ -198,6 +213,8 @@ class Parser:
                     if isinstance(expression, MemberExpression):
 
                         expression = MemberCallExpression(
+                            line=self.current().line,
+                            column=self.current().column,
                             object=expression,
                             function=name,
                             arguments=arguments
@@ -206,6 +223,8 @@ class Parser:
                     else:
 
                         expression = MethodCallExpression(
+                            line=self.current().line,
+                            column=self.current().column,
                             object=expression,
                             method=name,
                             arguments=arguments
@@ -216,6 +235,8 @@ class Parser:
 
 
                 expression = MemberExpression(
+                    line=self.current().line,
+                    column=self.current().column,
                     object=expression,
                     property=name
                 )
@@ -242,9 +263,11 @@ class Parser:
             right = self.parse_unary()
 
             left = BinaryExpression(
-                left,
-                operator.type,
-                right
+                line=self.current().line,
+                column=self.current().column,
+                left=left,
+                operator=operator.type,
+                right=right
             )
 
         return left
@@ -264,9 +287,11 @@ class Parser:
             right = self.parse_term()
 
             left = BinaryExpression(
-                left,
-                operator.type,
-                right
+                line=self.current().line,
+                column=self.current().column,
+                left=left,
+                operator=operator.type,
+                right=right
             )
 
         return left
@@ -293,9 +318,11 @@ class Parser:
             right = self.parse_addition()
 
             left = ComparisonExpression(
-                left,
-                operator,
-                right
+                line=self.current().line,
+                column=self.current().column,
+                left=left,
+                operator=operator,
+                right=right
             )
 
         return left
@@ -308,8 +335,10 @@ class Parser:
             self.advance()
 
             return UnaryExpression(
-                operator,
-                self.parse_unary()
+                line=self.current().line,
+                column=self.current().column,
+                operator=operator,
+                operand=self.parse_unary()
             )
 
         return self.parse_postfix()
@@ -326,9 +355,11 @@ class Parser:
             right = self.parse_comparison()
 
             left = LogicalExpression(
-                left,
-                operator,
-                right
+                line=self.current().line,
+                column=self.current().column,
+                left=left,
+                operator=operator,
+                right=right
             )
 
         return left
@@ -345,9 +376,11 @@ class Parser:
             right = self.parse_and()
 
             left = LogicalExpression(
-                left,
-                operator,
-                right
+                line=self.current().line,
+                column=self.current().column,
+                left=left,
+                operator=operator,
+                right=right
             )
 
         return left
@@ -363,6 +396,8 @@ class Parser:
         value = self.parse_expression()
 
         return LetStatement(
+            line=self.current().line,
+            column=self.current().column,
             name=name.value,
             value=value
         )
@@ -378,8 +413,10 @@ class Parser:
         value = self.parse_expression()
 
         return VarStatement(
-            name.value,
-            value
+            line=self.current().line,
+            column=self.current().column,
+            name=name.value,
+            value=value
         )
 
     def parse_assignment(self):
@@ -399,6 +436,8 @@ class Parser:
             value = self.parse_expression()
 
             return IndexAssignmentStatement(
+                line=self.current().line,
+                column=self.current().column,
                 object=Identifier(name.value),
                 index=index,
                 value=value
@@ -409,8 +448,10 @@ class Parser:
         value = self.parse_expression()
 
         return AssignmentStatement(
-            name.value,
-            value
+            line=self.current().line,
+            column=self.current().column,
+            name=name.value,
+            value=value
         )
 
     def parse_when(self):
@@ -434,9 +475,11 @@ class Parser:
             else_body = self.parse_block()
 
         return WhenStatement(
-            condition,
-            body,
-            else_body
+            line=self.current().line,
+            column=self.current().column,
+            condition=condition,
+            body=body,
+            else_body=else_body
         )
 
     def parse_while(self):
@@ -448,8 +491,10 @@ class Parser:
         body = self.parse_block()
 
         return WhileStatement(
-            condition,
-            body
+            line=self.current().line,
+            column=self.current().column,
+            condition=condition,
+            body=body
         )
 
     def parse_function(self):
@@ -487,6 +532,8 @@ class Parser:
         body = self.parse_block()
 
         return FunctionStatement(
+            line=self.current().line,
+            column=self.current().column,
             name=name.value,
             params=params,
             defaults=defaults,
@@ -528,7 +575,9 @@ class Parser:
         value = self.parse_expression()
 
         return ReturnStatement(
-            value
+            line=self.current().line,
+            column=self.current().column,
+            value=value
         )
 
     def parse_block(self):
@@ -550,19 +599,23 @@ class Parser:
 
         self.match(TokenType.RBRACE)
 
-        return Block(statements)
+        return Block(line=self.current().line,
+                        column=self.current().column,
+                        statements=statements)
 
     def parse_break(self):
 
         self.match(TokenType.BREAK)
 
-        return BreakStatement()
+        return BreakStatement(line=self.current().line,
+                        column=self.current().column)
 
     def parse_continue(self):
 
         self.match(TokenType.CONTINUE)
 
-        return ContinueStatement()
+        return ContinueStatement(line=self.current().line,
+                        column=self.current().column)
 
     def parse_import(self):
 
@@ -570,7 +623,10 @@ class Parser:
 
         module = self.match(TokenType.IDENTIFIER)
 
-        return ImportStatement(module.value)
+        return ImportStatement(
+            line=self.current().line,
+            column=self.current().column,
+            module=module.value)
 
     def parse_list(self):
 
@@ -599,6 +655,8 @@ class Parser:
         self.match(TokenType.RBRACKET)
 
         return ListLiteral(
+            line=self.current().line,
+            column=self.current().column,
             elements=elements
         )
 
@@ -619,7 +677,7 @@ class Parser:
 
                 value = self.parse_expression()
 
-                pairs.append(DictPair(key, value))
+                pairs.append(DictPair(key.line, key.column, key, value))
 
                 self.skip_newlines()
 
@@ -632,7 +690,10 @@ class Parser:
         self.skip_newlines()
         self.match(TokenType.RBRACE)
 
-        return DictLiteral(pairs)
+        return DictLiteral(
+            line=self.current().line,
+            column=self.current().column,
+            pairs=pairs)
 
     def parse_statement(self):
 
@@ -680,8 +741,10 @@ class Parser:
         if self.current().type == TokenType.RBRACE:
             return None
 
-        raise Exception(
-            f"Unexpected token {self.current().type}"
+        raise WizSyntaxError(
+            f"Unexpected token {self.current().type}",
+            self.current().line,
+            self.current().column
         )
 
     def skip_newlines(self):
@@ -700,4 +763,4 @@ class Parser:
 
             body.append(self.parse_statement())
 
-        return Program(body)
+        return Program(1, 1, body)

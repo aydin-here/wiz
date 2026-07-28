@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from tokens import TokenType
 
 
+@dataclass
 class Node:
-    pass
+    line: int
+    column: int
 
 
 @dataclass
@@ -22,12 +24,12 @@ class Block(Node):
     statements: list
 
 @dataclass
-class Argument:
+class Argument(Node):
     name: str | None
     value: object
 
 @dataclass
-class Parameter:
+class Parameter(Node):
     name: str
     default: Node | None = None
 
@@ -59,23 +61,23 @@ class ComparisonExpression(Node):
     right: Node
 
 @dataclass
-class LogicalExpression:
+class LogicalExpression(Node):
     left: any
     operator: TokenType
     right: any
 
 @dataclass
-class UnaryExpression:
+class UnaryExpression(Node):
     operator: TokenType
     operand: any
 
 @dataclass
-class IndexExpression:
+class IndexExpression(Node):
     object: any
     index: any
 
 @dataclass
-class MethodCallExpression:
+class MethodCallExpression(Node):
     object: any
     method: str
     arguments: list
@@ -92,12 +94,12 @@ class MemberCallExpression(Node):
     arguments: list[Argument]
 
 @dataclass
-class FunctionCallExpression:
+class FunctionCallExpression(Node):
     function: object
     arguments: list[Argument]
 
 @dataclass
-class MemberExpression:
+class MemberExpression(Node):
     object: object
     property: str
 
@@ -141,15 +143,15 @@ class ReturnStatement(Node):
     value: Node
 
 @dataclass
-class BreakStatement:
+class BreakStatement(Node):
     pass
 
 @dataclass
-class ContinueStatement:
+class ContinueStatement(Node):
     pass
 
 @dataclass
-class IndexAssignmentStatement:
+class IndexAssignmentStatement(Node):
     object: any
     index: any
     value: any
@@ -161,14 +163,14 @@ class ImportStatement(Node):
 # Literals
 
 @dataclass
-class ListLiteral:
+class ListLiteral(Node):
     elements: list["Node"]
 
 @dataclass
-class DictLiteral:
+class DictLiteral(Node):
     pairs: list
 
 @dataclass
-class DictPair:
+class DictPair(Node):
     key: any
     value: any

@@ -1,4 +1,5 @@
 from nodes import *
+from errors import *
 from tokens import TokenType
 from lexer import Lexer
 from parser import Parser
@@ -97,8 +98,10 @@ class Interpreter:
         scope = self.scopes[-1]
 
         if node.name in scope:
-            raise Exception(
-                f"Variable '{node.name}' already declared"
+            raise WizVariableDeclared(
+                f"Variable '{node.name}' already declared",
+                node.line,
+                node.column
             )
 
         value = self.visit(node.value)
@@ -113,8 +116,10 @@ class Interpreter:
         scope = self.scopes[-1]
 
         if node.name in scope:
-            raise Exception(
-                f"Variable '{node.name}' already declared"
+            raise WizVariableDeclared(
+                f"Variable '{node.name}' already declared",
+                node.line,
+                node.column
             )
 
         value = self.visit(node.value)
@@ -129,13 +134,17 @@ class Interpreter:
         variable = self.find_variable(node.name)
 
         if variable is None:
-            raise Exception(
-                f"Undefined variable '{node.name}'"
+            raise WizNameError(
+                f"Undefined variable '{node.name}'",
+                node.line,
+                node.column
             )
 
         if not variable["mutable"]:
-            raise Exception(
-                f"Cannot modify immutable variable '{node.name}'"
+            raise WizVariableNotImmutable(
+                f"Cannot modify immutable variable '{node.name}'",
+                node.line,
+                node.column
             )
 
         value = self.visit(node.value)
@@ -279,8 +288,10 @@ class Interpreter:
         variable = self.find_variable(node.name)
 
         if variable is None:
-            raise Exception(
-                f"Undefined variable '{node.name}'"
+            raise WizNameError(
+                f"Undefined variable '{node.name}'",
+                node.line,
+                node.column
             )
 
         return variable["value"]
@@ -320,7 +331,10 @@ class Interpreter:
         if node.operator == TokenType.MODULO:
             return left % right
 
-        raise Exception("Unknown operator")
+        raise WizSyntaxError(
+            "Unknown operator",
+            node.line,
+            node.column)
 
     def visit_ComparisonExpression(self, node):
 
@@ -345,7 +359,10 @@ class Interpreter:
         if node.operator == TokenType.NOT_EQUAL:
             return left != right
 
-        raise Exception("Unknown comparison operator")
+        raise WizSyntaxError(
+            "Unknown comparison operator",
+            node.line,
+            node.column)
 
     def visit_CallExpression(self, node):
 
@@ -370,8 +387,10 @@ class Interpreter:
         # ---------------- User functions ----------------
 
         if node.name not in self.functions:
-            raise Exception(
-                f"Undefined function '{node.name}'"
+            raise WizRuntimeError(
+                f"Undefined function '{node.name}'",
+                node.line,
+                node.column
             )
 
         function = self.functions[node.name]
@@ -389,13 +408,17 @@ class Interpreter:
             if argument.name is not None:
 
                 if argument.name not in function.params:
-                    raise Exception(
-                        f"Unknown parameter '{argument.name}'"
+                    raise WizParameterError(
+                        f"Unknown parameter '{argument.name}'",
+                        node.line,
+                        node.column
                     )
 
                 if argument.name in used:
-                    raise Exception(
-                        f"Parameter '{argument.name}' already assigned"
+                    raise WizParameterError(
+                        f"Parameter '{argument.name}' already assigned",
+                        node.line,
+                        node.column
                     )
 
                 scope[argument.name] = {
@@ -415,8 +438,10 @@ class Interpreter:
                     positional_index += 1
 
                 if positional_index >= len(function.params):
-                    raise Exception(
-                        f"Too many arguments for function '{node.name}'"
+                    raise WizRuntimeError(
+                        f"Too many arguments for function '{node.name}'",
+                        node.line,
+                        node.column
                     )
 
                 param = function.params[positional_index]
@@ -445,8 +470,10 @@ class Interpreter:
 
             else:
 
-                raise Exception(
-                    f"Missing required parameter '{param}'"
+                raise WizRuntimeError(
+                    f"Missing required parameter '{param}'",
+                    node.line,
+                    node.column
                 )
 
         try:
@@ -467,7 +494,10 @@ class Interpreter:
             if node.operator == TokenType.OR:
                 return left or self.visit(node.right)
     
-            raise Exception("Unknown logical operator")
+            raise WizSyntaxError(
+                "Unknown logical operator",
+                node.line,
+                node.column)
     
     def visit_UnaryExpression(self, node):
     
@@ -476,7 +506,10 @@ class Interpreter:
         if node.operator == TokenType.NOT:
             return not value
     
-        raise Exception("Unknown unary operator")
+        raise WizSyntaxError(
+            "Unknown unary operator",
+            node.line,
+            node.column)
 
     def visit_IndexExpression(self, node):
 
@@ -489,20 +522,26 @@ class Interpreter:
 
         except IndexError:
 
-            raise Exception(
-                f"Index {index} out of range"
+            raise WizIndexError(
+                f"Index {index} out of range",
+                node.line,
+                node.column
             )
 
         except KeyError:
 
-            raise Exception(
-                f"Key '{index}' not found"
+            raise WizKeyError(
+                f"Key '{index}' not found",
+                node.line,
+                node.column
             )
 
         except TypeError:
 
-            raise Exception(
-                f"Type '{type(obj).__name__}' does not support indexing"
+            raise WizTypeError(
+                f"Type '{type(obj).__name__}' does not support indexing",
+                node.line,
+                node.column
             )
 
     def visit_MethodCallExpression(self, node):
@@ -514,8 +553,10 @@ class Interpreter:
             func = obj.functions.get(node.method)
 
             if func is None:
-                raise Exception(
-                    f"Module has no function '{node.method}'"
+                raise WizRuntimeError(
+                    f"Module has no function '{node.method}'",
+                    node.line,
+                    node.column
                 )
 
             arguments = [
@@ -566,8 +607,10 @@ class Interpreter:
 
                 return method(obj, *arguments)
 
-        raise Exception(
-            f"This type has no methods: {type(obj).__name__}"
+        raise WizTypeError(
+            f"This type has no methods: {type(obj).__name__}",
+            node.line,
+            node.column
         )
 
     def visit_MemberCallExpression(self, node):
@@ -586,8 +629,10 @@ class Interpreter:
             func = obj.functions.get(node.function)
 
             if func is None:
-                raise Exception(
-                    f"Module has no function '{node.function}'"
+                raise WizRuntimeError(
+                    f"Module has no function '{node.function}'",
+                    node.line,
+                    node.column
                 )
 
 
@@ -628,8 +673,10 @@ class Interpreter:
                 )
 
 
-        raise Exception(
-            f"'{node.function}' is not callable on {type(obj).__name__}"
+        raise WizRuntimeError(
+            f"'{node.function}' is not callable on {type(obj).__name__}",
+            node.line,
+            node.column
         )
 
     def visit_MemberExpression(self, node):
@@ -642,8 +689,10 @@ class Interpreter:
             value = obj.get(node.property)
 
             if value is None:
-                raise Exception(
-                    f"No member '{node.property}' in module '{obj.name}'"
+                raise WizMemberError(
+                    f"No member '{node.property}' in module '{obj.name}'",
+                    node.line,
+                    node.column
                 )
 
             return value
@@ -655,8 +704,10 @@ class Interpreter:
             if node.property in obj:
                 return obj[node.property]
 
-            raise Exception(
-                f"Key '{node.property}' not found"
+            raise WizKeyError(
+                f"Key '{node.property}' not found",
+                node.line,
+                node.column
             )
 
 
@@ -666,8 +717,10 @@ class Interpreter:
             return getattr(obj, node.property)
 
 
-        raise Exception(
-            f"Cannot access member '{node.property}' on {type(obj).__name__}"
+        raise WizMemberError(
+            f"Cannot access member '{node.property}' on {type(obj).__name__}",
+            node.line,
+            node.column
         )
 
     def visit_FunctionCallExpression(self, node):
