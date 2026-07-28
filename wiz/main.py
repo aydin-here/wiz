@@ -4,7 +4,7 @@ from lexer import Lexer
 from parser import Parser
 from interpreter import Interpreter
 
-VERSION = "0.10.5"
+VERSION = "0.10.6"
 BANNER = """__        ___     
 \ \      / (_)____
  \ \ /\ / /| |_  /
