@@ -11,6 +11,9 @@ KEYWORDS = {
     "true": TokenType.BOOLEAN,
     "false": TokenType.BOOLEAN,
     "while": TokenType.WHILE,
+    "for": TokenType.FOR,
+    "in": TokenType.IN,
+    "step": TokenType.STEP,
     "and": TokenType.AND,
     "or": TokenType.OR,
     "not": TokenType.NOT,
@@ -221,6 +224,11 @@ class Lexer:
                 continue
 
             if char == ".":
+                if self.peek() == ".":
+                    tokens.append(self.make_token(TokenType.RANGE))
+                    self.advance()
+                    self.advance()
+                    continue
                 tokens.append(self.make_token(TokenType.DOT))
                 self.advance()
                 continue
@@ -273,6 +281,21 @@ class Lexer:
                 ):
                     self.advance()
 
+                continue
+
+            if char == "/" and self.peek() == "*":
+
+                while (
+                    self.current() is not None
+                    and not (
+                        self.current() == "*"
+                        and self.peek() == "/"
+                    )
+                ):
+                    self.advance()
+
+                self.advance()
+                self.advance()
                 continue
 
             if char == "/":

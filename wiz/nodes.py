@@ -132,6 +132,18 @@ class WhileStatement(Node):
     body: Block
 
 @dataclass
+class ForStatement(Node):
+    variable: str
+
+    iterable: Node | None
+
+    start: Node | None
+    end: Node | None
+    step: Node | None
+
+    body: Block
+
+@dataclass
 class FunctionStatement(Node):
     name: str
     params: list

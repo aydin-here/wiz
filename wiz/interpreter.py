@@ -180,6 +180,99 @@ class Interpreter:
             except ContinueException:
                 continue
 
+    def visit_ForStatement(self, node):
+
+        # ---------------- Iterable for ----------------
+
+        if node.iterable is not None:
+
+            iterable = self.visit(node.iterable)
+
+            for value in iterable:
+
+                scope = {
+                    node.variable: {
+                        "value": value,
+                        "mutable": True
+                    }
+                }
+
+                try:
+                    self.visit_Block(node.body, scope)
+
+                except BreakException:
+                    break
+
+                except ContinueException:
+                    continue
+
+            return
+
+
+        # ---------------- Numeric for ----------------
+
+        start = self.visit(node.start)
+        end = self.visit(node.end)
+
+        step = 1 if node.step is None else self.visit(node.step)
+
+        if step == 0:
+            raise WizRuntimeError(
+                "Step cannot be zero.",
+                node.line,
+                node.column
+            )
+
+        if start <= end:
+
+            current = start
+
+            while current < end:
+
+                scope = {
+                    node.variable: {
+                        "value": current,
+                        "mutable": True
+                    }
+                }
+
+                try:
+                    self.visit_Block(node.body, scope)
+
+                except BreakException:
+                    break
+
+                except ContinueException:
+                    current += abs(step)
+                    continue
+
+                current += abs(step)
+
+        else:
+
+            current = start
+
+            while current > end:
+
+                scope = {
+                    node.variable: {
+                        "value": current,
+                        "mutable": True
+                    }
+                }
+
+                try:
+                    self.visit_Block(node.body, scope)
+
+                except BreakException:
+                    break
+
+                except ContinueException:
+                    current -= abs(step)
+                    continue
+
+                current -= abs(step)
+
     def visit_FunctionStatement(self, node):
 
         node.closure = self.scopes.copy()
@@ -500,16 +593,23 @@ class Interpreter:
                 node.column)
     
     def visit_UnaryExpression(self, node):
-    
+
         value = self.visit(node.operand)
-    
+
         if node.operator == TokenType.NOT:
             return not value
-    
+
+        if node.operator == TokenType.MINUS:
+            return -value
+
+        if node.operator == TokenType.PLUS:
+            return +value
+
         raise WizSyntaxError(
             "Unknown unary operator",
             node.line,
-            node.column)
+            node.column
+        )
 
     def visit_IndexExpression(self, node):
 

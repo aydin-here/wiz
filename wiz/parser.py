@@ -329,7 +329,11 @@ class Parser:
 
     def parse_unary(self):
 
-        if self.current().type == TokenType.NOT:
+        if self.current().type in (
+            TokenType.NOT,
+            TokenType.MINUS,
+            TokenType.PLUS,
+        ):
 
             operator = self.current().type
             self.advance()
@@ -494,6 +498,60 @@ class Parser:
             line=self.current().line,
             column=self.current().column,
             condition=condition,
+            body=body
+        )
+
+    def parse_for(self):
+
+        self.match(TokenType.FOR)
+
+        variable = self.match(TokenType.IDENTIFIER).value
+
+        self.match(TokenType.IN)
+
+        start = self.parse_expression()
+
+        # Range Mode
+        if self.current().type == TokenType.RANGE:
+
+            self.advance()
+
+            end = self.parse_expression()
+
+            step = None
+
+            if self.current().type == TokenType.STEP:
+                self.advance()
+                step = self.parse_expression()
+
+            self.skip_newlines()
+
+            body = self.parse_block()
+
+            return ForStatement(
+                line=self.current().line,
+                column=self.current().column,
+                variable=variable,
+                iterable=None,
+                start=start,
+                end=end,
+                step=step,
+                body=body
+            )
+
+        # iterable mode
+        self.skip_newlines()
+
+        body = self.parse_block()
+
+        return ForStatement(
+            line=self.current().line,
+            column=self.current().column,
+            variable=variable,
+            iterable=start,
+            start=None,
+            end=None,
+            step=None,
             body=body
         )
 
@@ -719,6 +777,9 @@ class Parser:
 
         if self.current().type == TokenType.WHEN:
             return self.parse_when()
+
+        if self.current().type == TokenType.FOR:
+            return self.parse_for()
 
         if self.current().type == TokenType.WHILE:
             return self.parse_while()
