@@ -37,6 +37,9 @@ class Parameter(Node):
 class String(Node):
     value: str
 
+@dataclass
+class InterpolatedString(Node):
+    parts: list
 
 @dataclass
 class Number(Node):

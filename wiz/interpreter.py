@@ -367,6 +367,18 @@ class Interpreter:
     def visit_String(self, node):
         return node.value
 
+    def visit_InterpolatedString(self, node):
+
+        result = []
+
+        for part in node.parts:
+
+            value = self.visit(part)
+
+            result.append(str(value))
+
+        return "".join(result)
+
     def visit_Number(self, node):
         return node.value
 

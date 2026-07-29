@@ -23,6 +23,7 @@ class TokenType(Enum):
     IDENTIFIER = auto()
     NUMBER = auto()
     STRING = auto()
+    INTERPOLATED_STRING = auto()
     BOOLEAN = auto()
 
     # Operators

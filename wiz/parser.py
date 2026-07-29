@@ -1,6 +1,7 @@
 from tokens import TokenType
 from nodes import *
 from errors import WizSyntaxError
+from lexer import Lexer
 
 
 class Parser:
@@ -42,6 +43,9 @@ class Parser:
         if token.type == TokenType.STRING:
             self.advance()
             return String(line=token.line, column=token.column, value=token.value)
+
+        if token.type == TokenType.INTERPOLATED_STRING:
+            return self.parse_interpolated_string()
 
         if token.type == TokenType.NUMBER:
             self.advance()
@@ -716,6 +720,66 @@ class Parser:
             line=self.current().line,
             column=self.current().column,
             elements=elements
+        )
+
+    def parse_interpolated_string(self):
+
+        token = self.match(TokenType.INTERPOLATED_STRING)
+
+        text = token.value
+
+        parts = []
+
+        i = 0
+
+        while i < len(text):
+
+            if text[i] == "{":
+
+                end = text.find("}", i)
+
+                if end == -1:
+                    raise WizSyntaxError(
+                        "Missing '}' in interpolated string",
+                        token.line,
+                        token.column
+                    )
+
+                expression = text[i + 1:end].strip()
+
+                lexer = Lexer(expression)
+                tokens = lexer.tokenize()
+
+                parser = Parser(tokens)
+
+                node = parser.parse_expression()
+
+                parts.append(node)
+
+                i = end + 1
+
+            else:
+
+                start = i
+
+                while i < len(text) and text[i] != "{":
+                    i += 1
+
+                value = text[start:i]
+
+                if value:
+                    parts.append(
+                        String(
+                            line=token.line,
+                            column=token.column,
+                            value=value
+                        )
+                    )
+
+        return InterpolatedString(
+            line=token.line,
+            column=token.column,
+            parts=parts
         )
 
     def parse_dict(self):

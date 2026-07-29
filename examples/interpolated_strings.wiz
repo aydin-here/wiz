@@ -1,0 +1,9 @@
+let name = "Wiz"
+let version = 11
+
+func function()
+{
+    return 5
+}
+
+echo($"{name} version v{version} and we want to test {1 + 2} or even {function()}")

@@ -99,7 +99,7 @@ class Lexer:
         return self.make_token(TokenType.NUMBER, int(value))
 
     def string(self):
-        self.advance()  # رد شدن از "
+        self.advance()  # Skipping "
 
         start = self.position
 
@@ -108,9 +108,24 @@ class Lexer:
 
         value = self.source[start:self.position]
 
-        self.advance()  # رد شدن از "
+        self.advance()  # Skipping "
 
         return self.make_token(TokenType.STRING, value)
+
+    def interpolated_string(self):
+        self.advance() # Skipping $
+        self.advance() # Skipping "
+
+        start = self.position
+
+        while self.current() is not None and self.current() != '"':
+            self.advance()
+
+        value = self.source[start:self.position]
+
+        self.advance()  # Skipping "
+
+        return self.make_token(TokenType.INTERPOLATED_STRING, value)
 
     def tokenize(self):
         tokens = []
@@ -118,28 +133,33 @@ class Lexer:
         while self.current() is not None:
             char = self.current()
 
-            # فاصله
+            # Space
             if char in " \t":
                 self.advance()
                 continue
 
-            # خط جدید
+            # New Line
             if char == "\n":
                 tokens.append(self.make_token(TokenType.NEWLINE))
                 self.advance()
                 continue
 
-            # شناسه یا Keyword
+            # Variable or Keyword
             if char.isalpha() or char == "_":
                 tokens.append(self.identifier())
                 continue
 
-            # عدد
+            # Number
             if char.isdigit():
                 tokens.append(self.number())
                 continue
 
-            # رشته
+            # Interpolated String
+            if char == "$" and self.peek() == '"':
+                tokens.append(self.interpolated_string())
+                continue
+
+            # String
             if char == '"':
                 tokens.append(self.string())
                 continue
