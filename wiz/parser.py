@@ -490,6 +490,76 @@ class Parser:
             else_body=else_body
         )
 
+    def parse_switch(self):
+
+        self.match(TokenType.SWITCH)
+
+        expression = self.parse_expression()
+
+        self.skip_newlines()
+
+        self.match(TokenType.LBRACE)
+
+        self.skip_newlines()
+
+        cases = []
+        default = None
+
+        while self.current().type != TokenType.RBRACE:
+
+            if self.current().type == TokenType.NEWLINE:
+                self.advance()
+                continue
+
+            if self.current().type == TokenType.CASE:
+
+                self.advance()
+
+                value = self.parse_expression()
+
+                self.skip_newlines()
+
+                body = self.parse_block()
+
+                cases.append(
+                    SwitchCase(
+                        line=value.line,
+                        column=value.column,
+                        value=value,
+                        body=body
+                    )
+                )
+
+                self.skip_newlines()
+                continue
+
+            if self.current().type == TokenType.DEFAULT:
+
+                self.advance()
+
+                self.skip_newlines()
+
+                default = self.parse_block()
+
+                self.skip_newlines()
+                continue
+
+            raise WizSyntaxError(
+                "Expected 'case' or 'default'",
+                self.current().line,
+                self.current().column
+            )
+
+        self.match(TokenType.RBRACE)
+
+        return SwitchStatement(
+            line=expression.line,
+            column=expression.column,
+            expression=expression,
+            cases=cases,
+            default=default
+        )
+
     def parse_while(self):
 
         self.match(TokenType.WHILE)
@@ -841,6 +911,9 @@ class Parser:
 
         if self.current().type == TokenType.WHEN:
             return self.parse_when()
+
+        if self.current().type == TokenType.SWITCH:
+            return self.parse_switch()
 
         if self.current().type == TokenType.FOR:
             return self.parse_for()

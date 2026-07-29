@@ -159,13 +159,27 @@ class Interpreter:
 
     def visit_WhenStatement(self, node):
     
-            condition = self.visit(node.condition)
+        condition = self.visit(node.condition)
     
-            if condition:
-                self.visit(node.body)
+        if condition:
+            self.visit(node.body)
     
-            elif node.else_body:
-                self.visit(node.else_body)
+        elif node.else_body:
+            self.visit(node.else_body)
+
+    def visit_SwitchStatement(self, node):
+
+        expression = self.visit(node.expression)
+
+        for case in node.cases:
+            case = self.visit(case)
+
+            if expression == case["value"]:
+                self.visit(case["body"])
+                break
+        else:
+            if node.default is not None:
+                self.visit(node.default)
 
     def visit_WhileStatement(self, node):
 
@@ -413,6 +427,12 @@ class Interpreter:
                 self.visit(statement)
         finally:
             self.scopes.pop()
+
+    def visit_SwitchCase(self, node):
+        return {
+            "value": self.visit(node.value),
+            "body": node.body
+        }
 
     # Expressions
 

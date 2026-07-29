@@ -24,6 +24,11 @@ class Block(Node):
     statements: list
 
 @dataclass
+class SwitchCase(Node):
+    value: Node | None
+    body: Block
+
+@dataclass
 class Argument(Node):
     name: str | None
     value: object
@@ -174,6 +179,12 @@ class IndexAssignmentStatement(Node):
 @dataclass
 class ImportStatement(Node):
     module: str
+
+@dataclass
+class SwitchStatement(Node):
+    expression: Node
+    cases: list[SwitchCase]
+    default: Block | None
 
 # Literals
 

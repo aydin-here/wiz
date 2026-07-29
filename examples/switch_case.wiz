@@ -1,0 +1,187 @@
+// ==========================================
+// Switch / Case examples
+// ==========================================
+
+let status = 200
+
+echo("=== HTTP Status ===")
+
+switch status {
+
+    case 200 {
+        echo("OK")
+    }
+
+    case 301 {
+        echo("Moved Permanently")
+    }
+
+    case 404 {
+        echo("Not Found")
+    }
+
+    case 500 {
+        echo("Internal Server Error")
+    }
+
+    default {
+        echo("Unknown Status")
+    }
+
+}
+
+echo("")
+
+// ==========================================
+
+let grade = "B"
+
+echo("=== Grade ===")
+
+switch grade {
+
+    case "A" {
+        echo("Excellent")
+    }
+
+    case "B" {
+        echo("Very Good")
+    }
+
+    case "C" {
+        echo("Good")
+    }
+
+    case "D" {
+        echo("Needs Improvement")
+    }
+
+    default {
+        echo("Invalid Grade")
+    }
+
+}
+
+echo("")
+
+// ==========================================
+
+let isAdmin = true
+
+echo("=== Boolean ===")
+
+switch isAdmin {
+
+    case true {
+        echo("Administrator")
+    }
+
+    case false {
+        echo("Regular User")
+    }
+
+}
+
+echo("")
+
+// ==========================================
+
+let number = 7
+
+echo("=== Number ===")
+
+switch number {
+
+    case 1 {
+        echo("One")
+    }
+
+    case 5 {
+        echo("Five")
+    }
+
+    case 7 {
+        echo("Seven")
+    }
+
+    case 10 {
+        echo("Ten")
+    }
+
+    default {
+        echo("Other Number")
+    }
+
+}
+
+echo("")
+
+// ==========================================
+
+let fruit = "Orange"
+
+echo("=== Default Example ===")
+
+switch fruit {
+
+    case "Apple" {
+        echo("Apple")
+    }
+
+    case "Banana" {
+        echo("Banana")
+    }
+
+    case "Watermelon" {
+        echo("Watermelon")
+    }
+
+    default {
+        echo("Unknown Fruit")
+    }
+
+}
+
+echo("")
+
+// ==========================================
+// Nested example
+// ==========================================
+
+let role = "admin"
+
+echo("=== Nested Switch ===")
+
+switch role {
+
+    case "admin" {
+
+        let level = 2
+
+        switch level {
+
+            case 1 {
+                echo("Junior Admin")
+            }
+
+            case 2 {
+                echo("Senior Admin")
+            }
+
+            default {
+                echo("Unknown Admin Level")
+            }
+
+        }
+
+    }
+
+    case "user" {
+        echo("Regular User")
+    }
+
+    default {
+        echo("Guest")
+    }
+
+}
