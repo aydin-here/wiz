@@ -629,7 +629,10 @@ class Parser:
             body=body
         )
 
-    def parse_function(self):
+    def parse_function(self, decorators=None):
+
+        if decorators is None:
+            decorators = []
 
         self.match(TokenType.FUNC)
 
@@ -669,7 +672,8 @@ class Parser:
             name=name.value,
             params=params,
             defaults=defaults,
-            body=body
+            body=body,
+            decorators=decorators
         )
 
     # def parse_call(self):
@@ -852,6 +856,51 @@ class Parser:
             parts=parts
         )
 
+    def parse_decorators(self):
+
+        decorators = []
+
+        while self.current().type == TokenType.HASH:
+
+            decorators.append(self.parse_decorator())
+
+            while self.current().type == TokenType.NEWLINE:
+                self.match(TokenType.NEWLINE)
+
+        return decorators
+
+    def parse_decorator(self):
+
+        self.match(TokenType.HASH)
+
+        name = self.match(TokenType.IDENTIFIER).value
+
+        arguments = []
+
+        if self.current().type == TokenType.LPAREN:
+
+            self.match(TokenType.LPAREN)
+
+            if self.current().type != TokenType.RPAREN:
+
+                while True:
+
+                    arguments.append(self.parse_argument())
+
+                    if self.current().type != TokenType.COMMA:
+                        break
+
+                    self.match(TokenType.COMMA)
+
+            self.match(TokenType.RPAREN)
+
+        return Decorator(
+            line=self.current().line,
+            column=self.current().column,
+            name=name,
+            arguments=arguments
+        )
+
     def parse_dict(self):
 
         self.match(TokenType.LBRACE)
@@ -888,6 +937,8 @@ class Parser:
             pairs=pairs)
 
     def parse_statement(self):
+
+        decorators = []
 
         if self.current().type == TokenType.NEWLINE:
             self.advance()
@@ -930,8 +981,11 @@ class Parser:
         if self.current().type == TokenType.IMPORT:
             return self.parse_import()
 
+        if self.current().type == TokenType.HASH:
+            decorators = self.parse_decorators()
+
         if self.current().type == TokenType.FUNC:
-            return self.parse_function()
+            return self.parse_function(decorators)
 
         if self.current().type == TokenType.RETURN:
             return self.parse_return()

@@ -241,6 +241,11 @@ class Lexer:
                 self.advance()
                 continue
 
+            if char == "#":
+                tokens.append(self.make_token(TokenType.HASH))
+                self.advance()
+                continue
+
             if char == ",":
                 tokens.append(self.make_token(TokenType.COMMA))
                 self.advance()

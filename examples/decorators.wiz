@@ -1,0 +1,38 @@
+
+#deprecated
+func hello() {
+    return 1
+}
+
+#timer
+func ping() {
+    // do something, decorator will echo the time spent on this function
+}
+
+/*
+You can create your decorators too
+
+decorator on_command(command) {
+
+    before (ctx) {
+        echo("Function submitted")
+    }
+
+    after (ctx, state) {
+        echo("Function called")
+    }
+
+    error (ctx) {
+        echo("What was this function you wrote")
+    }
+
+}
+
+and use them
+
+#on_command("start")
+func other() {
+    ...
+}
+
+*/

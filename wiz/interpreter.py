@@ -38,6 +38,7 @@ class Interpreter:
             "echo": print,
             "get": input,
         }
+        self.decorators = {}
         self.methods = {
             list: {
                 "append": lambda obj, *args: obj.append(*args),
@@ -288,6 +289,9 @@ class Interpreter:
                 current -= abs(step)
 
     def visit_FunctionStatement(self, node):
+
+        for decorator in node.decorators:
+            self.apply_decorator(node, decorator)
 
         node.closure = self.scopes.copy()
 
@@ -901,11 +905,19 @@ class Interpreter:
 
     # Utils
 
-    def push_scope(self):
-        self.scopes.append({})
+    def apply_decorator(self, function, decorator):
 
-    def pop_scope(self):
-        self.scopes.pop()
+        if decorator.name in self.decorators:
+            return self.decorators[decorator.name](
+                function,
+                decorator.arguments
+            )
+
+        raise WizRuntimeError(
+            f"Unknown decorator '{decorator.name}'",
+            decorator.line,
+            decorator.column
+        )
 
 
     def find_variable(self, name):

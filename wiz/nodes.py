@@ -39,6 +39,11 @@ class Parameter(Node):
     default: Node | None = None
 
 @dataclass
+class Decorator(Node):
+    name: str
+    arguments: list[Argument]
+
+@dataclass
 class String(Node):
     value: str
 
@@ -157,6 +162,7 @@ class FunctionStatement(Node):
     params: list
     defaults: dict
     body: Block
+    decorators: list[Decorator]
 
 @dataclass
 class ReturnStatement(Node):
