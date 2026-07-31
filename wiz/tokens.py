@@ -21,6 +21,10 @@ class TokenType(Enum):
     BREAK = auto()
     CONTINUE = auto()
     IMPORT = auto()
+    DECORATOR = auto()
+    BEFORE = auto()
+    AFTER = auto()
+    ERROR = auto()
 
     # Literals
     IDENTIFIER = auto()

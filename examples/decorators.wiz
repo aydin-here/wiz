@@ -1,38 +1,175 @@
+/*
+====================================================
+                Wiz Decorators Example
+====================================================
+
+A decorator can execute code before, after, or when
+an error occurs during a function call.
+
+Built-in decorators:
+    #timer
+    #deprecated
+
+User decorators:
+    decorator my_decorator(...) { ... }
+
+Available hooks:
+    before(ctx)
+    after(ctx, state)
+    error(ctx)
+
+Objects:
+    ctx
+        .function.name
+        .function.params
+        .result
+
+    state
+        Stores values shared between hooks.
+
+====================================================
+*/
+
+
+// -------------------------------------------------
+// Built-in decorators
+// -------------------------------------------------
 
 #deprecated
-func hello() {
-    return 1
+func old_api() {
+    echo("Running old api")
 }
+
+old_api()
+
 
 #timer
-func ping() {
-    // do something, decorator will echo the time spent on this function
+func slow_function() {
+
+    var total = 0
+
+    for i in 0..100000 {
+        total = total + i
+    }
+
+    return total
 }
 
-/*
-You can create your decorators too
+slow_function()
+
+
+// -------------------------------------------------
+// User decorator
+// -------------------------------------------------
 
 decorator on_command(command) {
 
-    before (ctx) {
-        echo("Function submitted")
+    before(ctx) {
+
+        echo("--------------------------")
+        echo("Before calling function")
+        echo($"Command : {command}")
+        echo($"Function: {ctx.function.name}")
     }
 
-    after (ctx, state) {
-        echo("Function called")
+    after(ctx, state) {
+
+        echo("After calling function")
+        echo($"Returned: {ctx.result}")
+        echo("--------------------------")
     }
 
-    error (ctx) {
-        echo("What was this function you wrote")
+    error(ctx) {
+
+        echo($"Function '{ctx.function.name}' failed.")
     }
 
 }
 
-and use them
 
-#on_command("start")
-func other() {
-    ...
+// -------------------------------------------------
+// Using decorator arguments
+// -------------------------------------------------
+
+#on_command("help")
+func start() {
+
+    echo("Hello from start()")
+
+    return true
 }
 
-*/
+start()
+
+
+// -------------------------------------------------
+// Multiple decorators
+// -------------------------------------------------
+
+#timer
+#on_command("ping")
+func ping() {
+
+    echo("Pong")
+
+    return 200
+}
+
+ping()
+
+
+// -------------------------------------------------
+// Decorator with multiple parameters
+// -------------------------------------------------
+
+decorator permission(role, level) {
+
+    before(ctx) {
+
+        echo($"Required role : {role}")
+        echo($"Required level: {level}")
+    }
+
+}
+
+#permission("admin", 10)
+func dashboard() {
+
+    echo("Dashboard opened")
+
+}
+
+dashboard()
+
+
+// -------------------------------------------------
+// Default parameters
+// -------------------------------------------------
+
+decorator logger(prefix = "LOG") {
+
+    before(ctx) {
+
+        echo($"[{prefix}] {ctx.function.name}")
+
+    }
+
+}
+
+#logger()
+func hello() {
+
+    echo("Hello!")
+
+}
+
+hello()
+
+#logger("DEBUG")
+func debug() {
+
+    echo("Debug mode")
+
+}
+
+debug()

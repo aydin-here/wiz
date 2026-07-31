@@ -165,6 +165,15 @@ class FunctionStatement(Node):
     decorators: list[Decorator]
 
 @dataclass
+class DecoratorStatement(Node):
+    name: str
+    params: list[str]
+    defaults: dict[str, Node]
+    before: Block | None = None
+    after: Block | None = None
+    error: Block | None = None
+
+@dataclass
 class ReturnStatement(Node):
     value: Node
 

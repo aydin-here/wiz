@@ -901,6 +901,98 @@ class Parser:
             arguments=arguments
         )
 
+    def parse_decorator_statement(self):
+
+        self.match(TokenType.DECORATOR)
+
+        name = self.match(TokenType.IDENTIFIER).value
+
+        self.match(TokenType.LPAREN)
+
+        params = []
+        defaults = {}
+
+        if self.current().type != TokenType.RPAREN:
+
+            while True:
+
+                param_name = self.match(TokenType.IDENTIFIER).value
+
+                params.append(param_name)
+
+                if self.current().type == TokenType.ASSIGN:
+                    self.advance()
+                    defaults[param_name] = self.parse_expression()
+
+                if self.current().type != TokenType.COMMA:
+                    break
+
+                self.advance()
+
+        self.match(TokenType.RPAREN)
+
+        self.match(TokenType.LBRACE)
+
+        before = None
+        after = None
+        error = None
+
+        while self.current().type != TokenType.RBRACE:
+
+            self.skip_newlines()
+
+            if self.current().type == TokenType.RBRACE:
+                break
+
+            hook = self.match(TokenType.IDENTIFIER).value
+
+            self.match(TokenType.LPAREN)
+
+            depth = 1
+
+            while depth:
+
+                if self.current().type == TokenType.LPAREN:
+                    depth += 1
+
+                elif self.current().type == TokenType.RPAREN:
+                    depth -= 1
+
+                self.advance()
+
+            block = self.parse_block()
+
+            if hook == "before":
+                before = block
+
+            elif hook == "after":
+                after = block
+
+            elif hook == "error":
+                error = block
+
+            else:
+                raise WizSyntaxError(
+                    f"Unknown decorator hook '{hook}'",
+                    self.current().line,
+                    self.current().column
+                )
+
+            self.skip_newlines()
+
+        self.match(TokenType.RBRACE)
+
+        return DecoratorStatement(
+            line=self.current().line,
+            column=self.current().column,
+            name=name,
+            params=params,
+            defaults=defaults,
+            before=before,
+            after=after,
+            error=error
+        )
+
     def parse_dict(self):
 
         self.match(TokenType.LBRACE)
@@ -986,6 +1078,9 @@ class Parser:
 
         if self.current().type == TokenType.FUNC:
             return self.parse_function(decorators)
+        
+        if self.current().type == TokenType.DECORATOR:
+            return self.parse_decorator_statement()
 
         if self.current().type == TokenType.RETURN:
             return self.parse_return()

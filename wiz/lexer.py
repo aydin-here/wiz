@@ -22,7 +22,8 @@ KEYWORDS = {
     "not": TokenType.NOT,
     "break": TokenType.BREAK,
     "continue": TokenType.CONTINUE,
-    "import": TokenType.IMPORT
+    "import": TokenType.IMPORT,
+    "decorator": TokenType.DECORATOR
 }
 
 

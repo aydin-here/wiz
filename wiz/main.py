@@ -5,7 +5,7 @@ from parser import Parser
 from interpreter import Interpreter
 from errors import WizError
 
-VERSION = "0.15.8"
+VERSION = "0.16.8"
 BANNER = """__        ___     
 \ \      / (_)____
  \ \ /\ / /| |_  /

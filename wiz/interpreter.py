@@ -5,6 +5,7 @@ from lexer import Lexer
 from parser import Parser
 from runtime import Module
 from stdlib import STDLIB
+from decorators import *
 import os
 
 
@@ -38,7 +39,10 @@ class Interpreter:
             "echo": print,
             "get": input,
         }
-        self.decorators = {}
+        self.decorators = {
+            "timer": TimerDecorator(),
+            "deprecated": DeprecatedDecorator(),
+        }
         self.methods = {
             list: {
                 "append": lambda obj, *args: obj.append(*args),
@@ -297,6 +301,9 @@ class Interpreter:
 
         self.functions[node.name] = node
 
+    def visit_DecoratorStatement(self, node):
+
+        self.decorators[node.name] = UserDecorator(node)
 
     def visit_ReturnStatement(self, node):
 
@@ -523,7 +530,6 @@ class Interpreter:
             )
 
         function = self.functions[node.name]
-
         scope = {}
 
         used = set()
@@ -605,13 +611,51 @@ class Interpreter:
                     node.column
                 )
 
+        decorator_states = []
+
+        for decorator in function.decorators:
+
+            function._decorator = decorator
+
+            runtime = self.decorators.get(decorator.name)
+
+            if runtime:
+
+                ctx = DecoratorContext(
+                    self,
+                    function
+                )
+
+                state = DecoratorState()
+
+                runtime.before(ctx, state)
+
+                decorator_states.append(
+                    (runtime, ctx, state)
+                )
+
         try:
-            return self.visit_Block(function.body, scope)
+
+            result = self.visit_Block(function.body, scope)
 
         except ReturnException as e:
-            return e.value
 
-        return None
+            result = e.value
+
+        except Exception:
+
+            for runtime, ctx, state in decorator_states:
+                runtime.error(ctx)
+
+            raise
+
+        for runtime, ctx, state in decorator_states:
+
+            ctx.result = result
+
+            runtime.after(ctx, state)
+
+        return result
 
     def visit_LogicalExpression(self, node):
     
@@ -907,17 +951,22 @@ class Interpreter:
 
     def apply_decorator(self, function, decorator):
 
-        if decorator.name in self.decorators:
-            return self.decorators[decorator.name](
-                function,
-                decorator.arguments
+        runtime = self.decorators.get(decorator.name)
+
+        if runtime is None:
+            raise WizRuntimeError(
+                f"Unknown decorator '{decorator.name}'",
+                decorator.line,
+                decorator.column
             )
 
-        raise WizRuntimeError(
-            f"Unknown decorator '{decorator.name}'",
-            decorator.line,
-            decorator.column
-        )
+        if not hasattr(function, "decorators_runtime"):
+            function.decorators_runtime = []
+
+        function.decorators_runtime.append({
+            "runtime": runtime,
+            "arguments": decorator.arguments
+        })
 
 
     def find_variable(self, name):
