@@ -3,15 +3,14 @@
 <h1 align="center">Wiz Programming Language</h1>
 
 <p align="center">
-  <strong>A small, educational programming language written in Python.</strong><br>
-  Designed to make interpreter and programming language development easy to understand.
+  <strong>A modern educational programming language written entirely in Python.</strong><br>
+  Built to learn how interpreters and programming languages work without unnecessary complexity.
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/github/v/tag/aydin-here/wiz?label=version&sort=semver">
   <img src="https://img.shields.io/github/license/aydin-here/wiz">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue">
-  <img src="https://img.shields.io/github/actions/workflow/status/aydin-here/wiz/release.yml?branch=main">
   <img src="https://img.shields.io/github/downloads/aydin-here/wiz/total">
   <img src="https://img.shields.io/github/stars/aydin-here/wiz?style=social">
 </p>
@@ -20,41 +19,41 @@
 
 # About
 
-Wiz is a lightweight interpreted programming language implemented entirely in Python.
+Wiz is a lightweight interpreted programming language implemented completely in Python.
 
-The goal of the project is **education**, not performance.
+The goal of Wiz is **education**, not performance.
 
-Instead of hiding language internals behind complicated code, Wiz keeps every component readable and easy to extend so anyone can learn how programming languages actually work.
+Instead of hiding implementation details behind thousands of lines of code, Wiz keeps every part of the language readable so anyone can understand how a programming language actually works.
 
-The project contains:
+The language currently contains:
 
 * Lexer
 * Parser
 * AST
-* Tree-walking Interpreter
+* Tree-Walking Interpreter
 * Runtime
 * Module System
+* Decorator System
 * Standard Library
 * VSCode Extension
-* Automatic Releases
 
-Everything is written in pure Python.
+Everything is written using pure Python.
 
 ---
 
-# Features
-
-Current language features include:
+# Language Features
 
 ## Variables
 
-* Immutable variables (`let`)
-* Mutable variables (`var`)
-* Assignment
+### Immutable
 
 ```wiz
 let pi = 3.14
+```
 
+### Mutable
+
+```wiz
 var counter = 0
 
 counter = counter + 1
@@ -64,20 +63,23 @@ counter = counter + 1
 
 ## Data Types
 
+Supported types
+
 * Number
 * String
 * Boolean
 * List
 * Dictionary
+* Null
 
 ```wiz
-let number = 15
-let text = "Hello"
-let flag = true
+let age = 14
+let name = "Aydin"
+let admin = false
 
-let list = [1,2,3]
+let numbers = [1,2,3]
 
-let person = {
+let user = {
     "name": "Aydin",
     "age": 14
 }
@@ -87,7 +89,7 @@ let person = {
 
 ## Operators
 
-Arithmetic
+### Arithmetic
 
 ```
 +
@@ -97,7 +99,7 @@ Arithmetic
 %
 ```
 
-Comparison
+### Comparison
 
 ```
 ==
@@ -108,7 +110,7 @@ Comparison
 <=
 ```
 
-Logical
+### Logical
 
 ```
 and
@@ -121,27 +123,49 @@ not
 ## Conditions
 
 ```wiz
-when age >= 18
-{
+when age >= 18 {
     echo("Adult")
 }
-else
-{
+else {
     echo("Child")
 }
 ```
 
 ---
 
-## While Loops
+## Switch Statement
+
+```wiz
+switch day {
+
+    case 1 {
+        echo("Monday")
+    }
+
+    case 2 {
+        echo("Tuesday")
+    }
+
+    default {
+        echo("Unknown")
+    }
+
+}
+```
+
+---
+
+## While Loop
 
 ```wiz
 var i = 0
 
-while i < 5
-{
+while i < 5 {
+
     echo(i)
+
     i = i + 1
+
 }
 ```
 
@@ -152,12 +176,54 @@ Supports
 
 ---
 
-## Functions
+## For Loop
+
+Numeric loop
 
 ```wiz
-func hello(name)
-{
+for i in 0..10 {
+
+    echo(i)
+
+}
+```
+
+With step
+
+```wiz
+for i in 0..20 step 2 {
+
+    echo(i)
+
+}
+```
+
+Iterable loop
+
+```wiz
+let numbers = [1,2,3]
+
+for number in numbers {
+
+    echo(number)
+
+}
+```
+
+Supports
+
+* break
+* continue
+
+---
+
+# Functions
+
+```wiz
+func hello(name) {
+
     echo(name)
+
 }
 
 hello("Aydin")
@@ -165,19 +231,21 @@ hello("Aydin")
 
 Supports
 
-* return
-* recursion
-* named arguments
-* positional arguments
-* default values
+* Return values
+* Default values
+* Named arguments
+* Positional arguments
+* Mixed arguments
+* Recursion
 
 Example
 
 ```wiz
-func hello(name, age=18)
-{
+func hello(name, age=18) {
+
     echo(name)
     echo(age)
+
 }
 
 hello("Aydin")
@@ -188,14 +256,114 @@ hello(
 )
 ```
 
-Mixed arguments are also supported.
+---
+
+# Decorators
+
+Wiz supports decorators for modifying function behavior.
+
+## Built-in Decorators
+
+### Timer
+
+```wiz
+#timer
+
+func hello() {
+
+    return 5
+
+}
+
+hello()
+```
+
+Output
+
+```
+0.000012s
+```
 
 ---
 
-## Comments
+### Deprecated
 
 ```wiz
-// This is a comment
+#deprecated
+
+func old_function() {
+
+}
+
+old_function()
+```
+
+Output
+
+```
+Warning: old_function is deprecated
+```
+
+---
+
+## Custom Decorators
+
+Decorators can also be written directly in Wiz.
+
+```wiz
+decorator on_command(command) {
+
+    before(ctx) {
+
+        echo("Executing command")
+
+    }
+
+    after(ctx, state) {
+
+        echo($"Finished {command}")
+
+    }
+
+    error(ctx) {
+
+        echo("Command failed")
+
+    }
+
+}
+```
+
+Usage
+
+```wiz
+#on_command("start")
+
+func start() {
+
+    echo("Hello!")
+
+}
+
+start()
+```
+
+### Available Hooks
+
+| Hook   | Description                              |
+| ------ | ---------------------------------------- |
+| before | Executed before the function             |
+| after  | Executed after the function              |
+| error  | Executed if the function throws an error |
+
+---
+
+## String Interpolation
+
+```wiz
+let name = "Wiz"
+
+echo($"Hello {name}")
 ```
 
 ---
@@ -210,16 +378,16 @@ numbers.append(4)
 echo(numbers)
 ```
 
-Built-in methods
+Available methods
 
 * append
 * pop
 * insert
 * remove
 * clear
+* copy
 * reverse
 * sort
-* copy
 * extend
 * count
 * index
@@ -230,8 +398,10 @@ Built-in methods
 
 ```wiz
 let person = {
-    "name":"Aydin",
-    "age":14
+
+    "name": "Aydin",
+    "age": 14
+
 }
 
 echo(person.name)
@@ -239,22 +409,28 @@ echo(person.name)
 echo(person["age"])
 ```
 
-Built-in methods
+Available methods
 
 * get
 * keys
 * values
 * items
-* pop
 * update
-* copy
+* pop
 * clear
+* copy
 
 ---
 
 ## Strings
 
-Supported methods
+```wiz
+let text = "wiz"
+
+echo(text.upper())
+```
+
+Available methods
 
 * upper
 * lower
@@ -262,19 +438,20 @@ Supported methods
 * split
 * strip
 
-```wiz
-let name = "wiz"
-
-echo(name.upper())
-```
-
 ---
 
-## Standard Library
+# Standard Library
 
-Currently available modules
+Current modules
 
-### files
+```
+files
+json
+random
+http
+```
+
+Example
 
 ```wiz
 import files
@@ -284,36 +461,12 @@ let text = files.read("hello.txt")
 
 ---
 
-### json
+# Imports
 
 ```wiz
-import json
-```
+import math
 
----
-
-### random
-
-```wiz
-import random
-```
-
----
-
-### http
-
-```wiz
-import http
-```
-
----
-
-## Imports
-
-```wiz
-import utils
-
-utils.sayHello()
+math.sum(1,2)
 ```
 
 Modules are loaded from
@@ -330,38 +483,35 @@ inside the current project.
 
 ```
 echo()
+
 get()
 
-str()
-num()
-bool()
-
 len()
+
+str()
+
+num()
+
+bool()
 ```
 
 ---
 
 # Command Line
 
-Show help
-
-```bash
-python wiz/main.py help
-```
-
-Run a program
+Run
 
 ```bash
 python wiz/main.py run hello.wiz
 ```
 
-Print tokens
+Tokens
 
 ```bash
 python wiz/main.py tokens hello.wiz
 ```
 
-Print AST
+AST
 
 ```bash
 python wiz/main.py ast hello.wiz
@@ -373,23 +523,31 @@ Version
 python wiz/main.py version
 ```
 
+Help
+
+```bash
+python wiz/main.py help
+```
+
 ---
 
 # Example Programs
 
-The repository contains ready-to-run examples.
-
 ```
 examples/
+
 ├── calculator.wiz
-├── conditions.wiz
+├── decorators.wiz
 ├── dictionaries.wiz
 ├── files.wiz
+├── for.wiz
 ├── functions.wiz
 ├── hello.wiz
+├── interpolation.wiz
 ├── lists.wiz
 ├── modules.wiz
 ├── named_arguments.wiz
+├── switch.wiz
 ├── variables.wiz
 └── while.wiz
 ```
@@ -397,7 +555,7 @@ examples/
 Run any example
 
 ```bash
-python wiz/main.py run examples/hello.wiz
+python wiz/main.py run examples/decorators.wiz
 ```
 
 ---
@@ -405,125 +563,79 @@ python wiz/main.py run examples/hello.wiz
 # Project Structure
 
 ```text
-.
-├── documentation.md
-├── examples
-│   ├── calculator.wiz
-│   ├── conditions.wiz
-│   ├── dictionaries.wiz
-│   ├── files.wiz
-│   ├── functions.wiz
-│   ├── hello.wiz
-│   ├── lists.wiz
-│   ├── modules.wiz
-│   ├── named_arguments.wiz
-│   ├── variables.wiz
-│   └── while.wiz
-├── .github
-│   └── workflows
-│       └── release.yml
-├── LICENSE
-├── README.md
-└── wiz
-    ├── interpreter.py
-    ├── lexer.py
-    ├── main.py
-    ├── nodes.py
-    ├── parser.py
-    ├── runtime.py
-    ├── tokens.py
-    └── stdlib
-        ├── files.py
-        ├── http.py
-        ├── json.py
-        ├── random.py
-        └── __init__.py
+wiz/
+
+├── decorators.py
+├── errors.py
+├── interpreter.py
+├── lexer.py
+├── main.py
+├── nodes.py
+├── parser.py
+├── runtime.py
+├── stdlib
+│   ├── files.py
+│   ├── http.py
+│   ├── json.py
+│   ├── random.py
+│   └── __init__.py
+├── tokens.py
+└── vscode-extension
 ```
 
 ---
 
 # VSCode Extension
 
-A dedicated Visual Studio Code extension is available.
-
-Features
+The official extension provides
 
 * Syntax Highlighting
-* Comments
 * Keywords
-* Functions
+* Decorators
+* Hooks
+* Built-in Functions
 * Numbers
 * Strings
-* Operators
-
-Install
-
-```
-wiz-*.vsix
-```
-
-or install it directly from the Marketplace once published.
-
----
-
-# Building
-
-Create a standalone executable
-
-```bash
-pyinstaller \
-    --onefile \
-    --name wiz \
-    wiz/main.py
-```
-
----
-
-# Documentation
-
-More implementation details are available in
-
-```
-documentation.md
-```
+* Variables
+* Parameters
+* Comments
 
 ---
 
 # Roadmap
 
-Planned features
+Upcoming features
 
 * Classes
 * Interfaces
 * Enums
 * Pattern Matching
-* Lambda Expressions
-* Switch Statement
-* For Loops
-* Package Manager
+* Exceptions
+* Lambdas
 * Bytecode Compiler
 * Virtual Machine
-* Language Server (LSP)
-* Debugger
 * REPL
-* Official Formatter
+* Debugger
+* Formatter
+* Package Manager
 * Package Registry
+* Language Server Protocol (LSP)
 
 ---
 
 # Contributing
 
-Contributions are welcome.
+Pull requests are always welcome.
 
-Possible areas to improve
+Areas that can be improved
 
-* Parser
 * Interpreter
-* Error reporting
+* Parser
+* Error Reporting
+* Runtime
 * Standard Library
-* Optimizations
-* Documentation
 * VSCode Extension
+* Documentation
 
 ---
 
@@ -531,10 +643,11 @@ Possible areas to improve
 
 This project is licensed under the MIT License.
 
-See the **LICENSE** file for details.
+See the **LICENSE** file for more information.
 
 ---
 
 <p align="center">
-Made with ❤️ using Python.
+Made with ❤️ in Python.<br>
+Aydin Rahbaran &copy 2026
 </p>

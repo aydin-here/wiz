@@ -1,3 +1,5 @@
+### (This documentation is behind the current version and it is not up to date)
+
 # Wiz Language Documentation
 
 ## Overview
