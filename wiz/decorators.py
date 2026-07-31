@@ -165,6 +165,15 @@ class DecoratorContext:
         self.function = function
         self.result = None
 
+    def call(self):
+
+        scope = {}
+
+        return self.interpreter.visit_Block(
+            self.function.body,
+            scope
+        )
+
 class TimerDecorator(DecoratorRuntime):
 
     def before(self, ctx, state):

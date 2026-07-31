@@ -21,6 +21,10 @@ class BreakException(Exception):
 class ContinueException(Exception):
     pass
 
+class WizFunction:
+    def __init__(self, statement):
+        self.statement = statement
+
 class Interpreter:
 
     def __init__(self, base_path="."):
@@ -42,6 +46,9 @@ class Interpreter:
         self.decorators = {
             "timer": TimerDecorator(),
             "deprecated": DeprecatedDecorator(),
+        }
+        self.context_methods = {
+            "call": self.decorator_call
         }
         self.methods = {
             list: {
@@ -299,7 +306,7 @@ class Interpreter:
 
         node.closure = self.scopes.copy()
 
-        self.functions[node.name] = node
+        self.functions[node.name] = WizFunction(node)
 
     def visit_DecoratorStatement(self, node):
 
@@ -418,6 +425,10 @@ class Interpreter:
         variable = self.find_variable(node.name)
 
         if variable is None:
+
+            if node.name in self.functions:
+                return self.functions[node.name]
+            
             raise WizNameError(
                 f"Undefined variable '{node.name}'",
                 node.line,
@@ -522,6 +533,53 @@ class Interpreter:
 
         # ---------------- User functions ----------------
 
+        variable = self.find_variable(node.name)
+
+        if variable is not None:
+
+            func = variable["value"]
+
+            if isinstance(func, WizFunction):
+
+                function = func.statement
+
+                scope = {}
+
+                for param, arg in zip(
+                    function.params,
+                    node.arguments
+                ):
+                    scope[param] = {
+                        "value": self.visit(arg.value),
+                        "mutable": True
+                    }
+
+                for param in function.params:
+
+                    if param not in scope:
+
+                        if param in function.defaults:
+                            scope[param] = {
+                                "value": self.visit(function.defaults[param]),
+                                "mutable": True
+                            }
+
+                        else:
+                            raise WizRuntimeError(
+                                f"Missing required parameter '{param}'",
+                                node.line,
+                                node.column
+                            )
+
+                try:
+                    return self.visit_Block(
+                        function.body,
+                        scope
+                    )
+
+                except ReturnException as e:
+                    return e.value
+
         if node.name not in self.functions:
             raise WizRuntimeError(
                 f"Undefined function '{node.name}'",
@@ -529,7 +587,7 @@ class Interpreter:
                 node.column
             )
 
-        function = self.functions[node.name]
+        function = self.functions[node.name].statement
         scope = {}
 
         used = set()
@@ -727,6 +785,22 @@ class Interpreter:
     def visit_MethodCallExpression(self, node):
 
         obj = self.visit(node.object)
+
+        if type(obj).__name__ == "DecoratorContext":
+
+            method = self.context_methods.get(node.method)
+
+            if method:
+
+                arguments = [
+                    self.visit(arg)
+                    for arg in node.arguments
+                ]
+
+                return method(
+                    obj,
+                    *arguments
+                )
 
         if hasattr(obj, "functions"):
 
@@ -968,6 +1042,29 @@ class Interpreter:
             "arguments": decorator.arguments
         })
 
+    def decorator_call(self, ctx, *args):
+
+        function = ctx.function
+
+        scope = {}
+
+        for param, arg in zip(
+            function.params,
+            args
+        ):
+            scope[param] = {
+                "value": self.visit(arg),
+                "mutable": True
+            }
+
+        try:
+            return self.visit_Block(
+                function.body,
+                scope
+            )
+
+        except ReturnException as e:
+            return e.value
 
     def find_variable(self, name):
 

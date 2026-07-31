@@ -23,7 +23,8 @@ Objects:
         .function.name
         .function.params
         .result
-
+        .call()
+        
     state
         Stores values shared between hooks.
 
