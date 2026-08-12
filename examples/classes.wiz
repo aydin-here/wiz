@@ -1,0 +1,33 @@
+class Person {
+
+    let species = "Human"
+
+    func init(name, age) {
+        self.name = name
+        self.age = age
+    }
+
+    func greet() {
+        echo("Hello, I am " + self.name)
+    }
+
+    func birthday() {
+        self.age = self.age + 1
+        return self.age
+    }
+
+    func describe() {
+        echo("Name : " + self.name)
+        echo("Age  : " + str(self.age))
+        echo("Spec : " + Person.species)
+    }
+
+}
+
+let person = Person("Aydin", 18)
+
+person.greet()
+person.describe()
+
+echo(person.birthday())
+echo(person.name)

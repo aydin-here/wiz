@@ -20,6 +20,7 @@ class TokenType(Enum):
     RANGE = auto()
     BREAK = auto()
     CONTINUE = auto()
+    CLASS = auto()
     IMPORT = auto()
     DECORATOR = auto()
     BEFORE = auto()

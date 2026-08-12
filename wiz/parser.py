@@ -462,6 +462,27 @@ class Parser:
             value=value
         )
 
+    def parse_member_assignment(self, expression):
+
+        self.match(TokenType.ASSIGN)
+
+        value = self.parse_expression()
+
+        if isinstance(expression, MemberExpression):
+
+            return MemberAssignmentStatement(
+                line=expression.line,
+                column=expression.column,
+                object=expression,
+                value=value
+            )
+
+        raise WizSyntaxError(
+            "Invalid assignment target",
+            self.current().line,
+            self.current().column
+        )
+
     def parse_when(self):
 
         self.match(TokenType.WHEN)
@@ -626,6 +647,23 @@ class Parser:
             start=None,
             end=None,
             step=None,
+            body=body
+        )
+
+    def parse_class(self):
+
+        self.match(TokenType.CLASS)
+
+        name = self.match(TokenType.IDENTIFIER)
+
+        self.skip_newlines()
+
+        body = self.parse_block()
+
+        return ClassStatement(
+            line=self.current().line,
+            column=self.current().column,
+            name=name.value,
             body=body
         )
 
@@ -1050,7 +1088,12 @@ class Parser:
             ):
                 return self.parse_assignment()
 
-            return self.parse_expression()
+            expression = self.parse_expression()
+
+            if self.current().type == TokenType.ASSIGN:
+                return self.parse_member_assignment(expression)
+
+            return expression
 
         if self.current().type == TokenType.WHEN:
             return self.parse_when()
@@ -1069,6 +1112,9 @@ class Parser:
 
         if self.current().type == TokenType.CONTINUE:
             return self.parse_continue()
+
+        if self.current().type == TokenType.CLASS:
+            return self.parse_class()
 
         if self.current().type == TokenType.IMPORT:
             return self.parse_import()

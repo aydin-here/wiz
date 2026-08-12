@@ -3,7 +3,7 @@ from errors import *
 from tokens import TokenType
 from lexer import Lexer
 from parser import Parser
-from runtime import Module
+from runtime import Module, WizClass, WizInstance
 from stdlib import STDLIB
 from decorators import *
 import os
@@ -32,6 +32,7 @@ class Interpreter:
             {}
         ]
         self.functions = {}
+        self.classes = {}
         self.stdlib = STDLIB
         self.modules = {}
         self.base_path = base_path
@@ -308,6 +309,14 @@ class Interpreter:
 
         self.functions[node.name] = WizFunction(node)
 
+    def visit_ClassStatement(self, node):
+
+        klass = WizClass(node.name, node)
+
+        klass.define(self)
+
+        self.classes[node.name] = klass
+
     def visit_DecoratorStatement(self, node):
 
         self.decorators[node.name] = UserDecorator(node)
@@ -333,6 +342,34 @@ class Interpreter:
         value = self.visit(node.value)
 
         obj[index] = value
+
+    def visit_MemberAssignmentStatement(self, node):
+
+        target = node.object
+
+        if isinstance(target, MemberExpression):
+
+            obj = self.visit(target.object)
+
+            value = self.visit(node.value)
+
+            if isinstance(obj, WizInstance):
+
+                obj.attributes[target.property] = value
+
+                return
+
+            raise WizTypeError(
+                f"Cannot assign to member '{target.property}' on {type(obj).__name__}",
+                node.line,
+                node.column
+            )
+
+        raise WizTypeError(
+            "Invalid assignment target",
+            node.line,
+            node.column
+        )
 
     def visit_ImportStatement(self, node):
 
@@ -373,6 +410,7 @@ class Interpreter:
 
         self.scopes = [module_scope]
         self.functions = {}
+        self.classes = {}
 
 
         self.visit(tree)
@@ -428,7 +466,10 @@ class Interpreter:
 
             if node.name in self.functions:
                 return self.functions[node.name]
-            
+
+            if node.name in self.classes:
+                return self.classes[node.name]
+
             raise WizNameError(
                 f"Undefined variable '{node.name}'",
                 node.line,
@@ -580,6 +621,14 @@ class Interpreter:
                 except ReturnException as e:
                     return e.value
 
+        # ---------------- Classes ----------------
+
+        if node.name in self.classes:
+
+            klass = self.classes[node.name]
+
+            return klass.instantiate(self, node)
+
         if node.name not in self.functions:
             raise WizRuntimeError(
                 f"Undefined function '{node.name}'",
@@ -588,86 +637,8 @@ class Interpreter:
             )
 
         function = self.functions[node.name].statement
-        scope = {}
 
-        used = set()
-        positional_index = 0
-
-        for argument in node.arguments:
-
-            value = self.visit(argument.value)
-
-            # ---------- Named argument ----------
-            if argument.name is not None:
-
-                if argument.name not in function.params:
-                    raise WizParameterError(
-                        f"Unknown parameter '{argument.name}'",
-                        node.line,
-                        node.column
-                    )
-
-                if argument.name in used:
-                    raise WizParameterError(
-                        f"Parameter '{argument.name}' already assigned",
-                        node.line,
-                        node.column
-                    )
-
-                scope[argument.name] = {
-                    "value": value,
-                    "mutable": True
-                }
-
-                used.add(argument.name)
-
-            # ---------- Positional argument ----------
-            else:
-
-                while (
-                    positional_index < len(function.params)
-                    and function.params[positional_index] in used
-                ):
-                    positional_index += 1
-
-                if positional_index >= len(function.params):
-                    raise WizRuntimeError(
-                        f"Too many arguments for function '{node.name}'",
-                        node.line,
-                        node.column
-                    )
-
-                param = function.params[positional_index]
-
-                scope[param] = {
-                    "value": value,
-                    "mutable": True
-                }
-
-                used.add(param)
-                positional_index += 1
-
-        # ---------- Missing parameters ----------
-
-        for param in function.params:
-
-            if param in scope:
-                continue
-
-            if param in function.defaults:
-
-                scope[param] = {
-                    "value": self.visit(function.defaults[param]),
-                    "mutable": True
-                }
-
-            else:
-
-                raise WizRuntimeError(
-                    f"Missing required parameter '{param}'",
-                    node.line,
-                    node.column
-                )
+        scope = self.bind_arguments(function, node)
 
         decorator_states = []
 
@@ -802,6 +773,37 @@ class Interpreter:
                     *arguments
                 )
 
+        if isinstance(obj, WizInstance):
+
+            method = obj.klass.methods.get(node.method)
+
+            if method is None:
+                raise WizRuntimeError(
+                    f"Class '{obj.klass.name}' has no method '{node.method}'",
+                    node.line,
+                    node.column
+                )
+
+            scope = self.bind_arguments(method, node)
+
+            scope["self"] = {
+                "value": obj,
+                "mutable": True
+            }
+
+            old_scopes = self.scopes
+
+            self.scopes = method.closure + [scope]
+
+            try:
+                return self.visit_Block(method.body, scope)
+
+            except ReturnException as e:
+                return e.value
+
+            finally:
+                self.scopes = old_scopes
+
         if hasattr(obj, "functions"):
 
             func = obj.functions.get(node.method)
@@ -912,6 +914,46 @@ class Interpreter:
                 return e.value
 
 
+        # Instance methods
+        if isinstance(obj, WizInstance):
+
+            method = obj.klass.methods.get(node.function)
+
+            if method is None:
+                raise WizRuntimeError(
+                    f"Class '{obj.klass.name}' has no method '{node.function}'",
+                    node.line,
+                    node.column
+                )
+
+            scope = {}
+            scope["self"] = {
+                "value": obj,
+                "mutable": True
+            }
+
+            for param, value in zip(
+                method.params,
+                arguments
+            ):
+                scope[param] = {
+                    "value": value,
+                    "mutable": True
+                }
+
+            old_scopes = self.scopes
+
+            self.scopes = method.closure + [scope]
+
+            try:
+                return self.visit_Block(method.body, scope)
+
+            except ReturnException as e:
+                return e.value
+
+            finally:
+                self.scopes = old_scopes
+
         # Object methods
         methods = self.methods.get(type(obj))
 
@@ -960,6 +1002,35 @@ class Interpreter:
 
             raise WizKeyError(
                 f"Key '{node.property}' not found",
+                node.line,
+                node.column
+            )
+
+
+        # Instance attribute access
+        if isinstance(obj, WizInstance):
+
+            if node.property in obj.attributes:
+                return obj.attributes[node.property]
+
+            raise WizMemberError(
+                f"Class '{obj.klass.name}' has no attribute '{node.property}'",
+                node.line,
+                node.column
+            )
+
+
+        # Class member access
+        if isinstance(obj, WizClass):
+
+            if node.property in obj.variables:
+                return obj.variables[node.property]
+
+            if node.property in obj.methods:
+                return obj.methods[node.property]
+
+            raise WizMemberError(
+                f"Class '{obj.name}' has no member '{node.property}'",
                 node.line,
                 node.column
             )
@@ -1074,3 +1145,84 @@ class Interpreter:
                 return scope[name]
 
         return None
+
+    def bind_arguments(self, function, node):
+
+        scope = {}
+
+        used = set()
+        positional_index = 0
+
+        for argument in node.arguments:
+
+            value = self.visit(argument.value)
+
+            if argument.name is not None:
+
+                if argument.name not in function.params:
+                    raise WizParameterError(
+                        f"Unknown parameter '{argument.name}'",
+                        node.line,
+                        node.column
+                    )
+
+                if argument.name in used:
+                    raise WizParameterError(
+                        f"Parameter '{argument.name}' already assigned",
+                        node.line,
+                        node.column
+                    )
+
+                scope[argument.name] = {
+                    "value": value,
+                    "mutable": True
+                }
+
+                used.add(argument.name)
+
+            else:
+
+                while (
+                    positional_index < len(function.params)
+                    and function.params[positional_index] in used
+                ):
+                    positional_index += 1
+
+                if positional_index >= len(function.params):
+                    raise WizRuntimeError(
+                        f"Too many arguments for function '{function.name}'",
+                        node.line,
+                        node.column
+                    )
+
+                param = function.params[positional_index]
+
+                scope[param] = {
+                    "value": value,
+                    "mutable": True
+                }
+
+                used.add(param)
+                positional_index += 1
+
+        for param in function.params:
+
+            if param in scope:
+                continue
+
+            if param in function.defaults:
+
+                scope[param] = {
+                    "value": self.visit(function.defaults[param]),
+                    "mutable": True
+                }
+
+            else:
+
+                raise WizRuntimeError(
+                    f"Missing required parameter '{param}'",
+                    node.line,
+                    node.column
+                )
+
+        return scope

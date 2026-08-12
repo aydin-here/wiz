@@ -165,6 +165,11 @@ class FunctionStatement(Node):
     decorators: list[Decorator]
 
 @dataclass
+class ClassStatement(Node):
+    name: str
+    body: Block
+
+@dataclass
 class DecoratorStatement(Node):
     name: str
     params: list[str]
@@ -189,6 +194,11 @@ class ContinueStatement(Node):
 class IndexAssignmentStatement(Node):
     object: any
     index: any
+    value: any
+
+@dataclass
+class MemberAssignmentStatement(Node):
+    object: any
     value: any
 
 @dataclass
