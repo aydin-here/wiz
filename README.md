@@ -133,6 +133,23 @@ else {
 }
 ```
 
+### One-line Conditions
+
+`when` can also be used as an expression that produces a value, in any
+expression position (assignments, arguments, interpolated strings, ...).
+
+```wiz
+let status = when age >= 18 { "Adult" } else { "Child" }
+
+echo($"You are {when age >= 18 { "adult" } else { "child" }}")
+```
+
+Braces are optional when the branches are single expressions:
+
+```wiz
+let allowed = when admin true else false
+```
+
 ---
 
 ## Switch Statement
@@ -256,6 +273,31 @@ hello(
     age=20,
     name="John"
 )
+```
+
+### One-line Functions
+
+Functions can have an expression body with `=>`, returning the expression's
+value. Anonymous functions can be created with `func(params) ...`.
+
+```wiz
+func is_even(n) => n % 2 == 0
+
+let double = func(x) => x * 2
+
+let max = func(a, b) => when a > b { a } else { b }
+
+echo(is_even(4))
+echo(double(5))
+echo(max(3, 7))
+```
+
+Anonymous functions also support block bodies:
+
+```wiz
+let add = func(a, b) {
+    return a + b
+}
 ```
 
 ---
@@ -446,6 +488,61 @@ Available methods
 * replace
 * split
 * strip
+
+---
+
+# Classes & Inheritance
+
+Classes group state and behavior together.
+
+```wiz
+class Animal {
+
+    let kingdom = "Animalia"
+
+    func init(name, sound) {
+        self.name = name
+        self.sound = sound
+    }
+
+    func speak() {
+        echo(self.name + " says " + self.sound)
+    }
+
+}
+
+let animal = Animal("Cat", "Meow")
+
+animal.speak()
+```
+
+A class can extend another class with `extends`, inheriting its methods and
+class variables. The child may override inherited members and call the parent
+with `super`.
+
+```wiz
+class Dog extends Animal {
+
+    func init(name) {
+        super.init(name, "Woof!")
+    }
+
+    func speak() {
+        super.speak()
+        echo("Also wags its tail")
+    }
+
+}
+
+let dog = Dog("Rex")
+
+dog.speak()
+```
+
+* Child classes inherit parent methods and class variables.
+* Children can override any inherited method or variable.
+* `super` calls the parent implementation from inside a child method.
+* Inheritance chains (grandparent -> parent -> child) are supported.
 
 ---
 
@@ -750,7 +847,6 @@ The official extension provides
 
 Upcoming features
 
-* Classes
 * Interfaces
 * Enums
 * Pattern Matching

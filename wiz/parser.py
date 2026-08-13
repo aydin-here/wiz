@@ -75,6 +75,12 @@ class Parser:
 
             return expression
 
+        if token.type == TokenType.WHEN:
+            return self.parse_when_expression()
+
+        if token.type == TokenType.FUNC:
+            return self.parse_function_expression()
+
         raise WizSyntaxError(
             f"Invalid expression starting with {describe_token(token)}",
             token.line,
@@ -521,6 +527,44 @@ class Parser:
             else_body=else_body
         )
 
+    def parse_when_expression(self):
+
+        when = self.match(TokenType.WHEN)
+
+        condition = self.parse_expression()
+
+        consequent = self.parse_when_branch()
+
+        alternate = None
+
+        if self.current().type == TokenType.ELSE:
+
+            self.advance()
+
+            alternate = self.parse_when_branch()
+
+        return WhenExpression(
+            line=when.line,
+            column=when.column,
+            condition=condition,
+            consequent=consequent,
+            alternate=alternate
+        )
+
+    def parse_when_branch(self):
+
+        if self.current().type == TokenType.LBRACE:
+
+            self.advance()
+
+            expression = self.parse_expression()
+
+            self.match(TokenType.RBRACE)
+
+            return expression
+
+        return self.parse_expression()
+
     def parse_switch(self):
 
         switch = self.match(TokenType.SWITCH)
@@ -668,6 +712,16 @@ class Parser:
 
         name = self.match(TokenType.IDENTIFIER)
 
+        extends = None
+
+        if self.current().type == TokenType.EXTENDS:
+
+            self.advance()
+
+            parent = self.match(TokenType.IDENTIFIER)
+
+            extends = parent.value
+
         self.skip_newlines()
 
         body = self.parse_block()
@@ -676,7 +730,8 @@ class Parser:
             line=name.line,
             column=name.column,
             name=name.value,
-            body=body
+            body=body,
+            extends=extends
         )
 
     def parse_function(self, decorators=None):
@@ -714,7 +769,27 @@ class Parser:
 
         self.skip_newlines()
 
-        body = self.parse_block()
+        if self.current().type == TokenType.ARROW:
+
+            self.advance()
+
+            expression = self.parse_expression()
+
+            body = Block(
+                line=expression.line,
+                column=expression.column,
+                statements=[
+                    ReturnStatement(
+                        line=expression.line,
+                        column=expression.column,
+                        value=expression
+                    )
+                ]
+            )
+
+        else:
+
+            body = self.parse_block()
 
         return FunctionStatement(
             line=name.line,
@@ -724,6 +799,66 @@ class Parser:
             defaults=defaults,
             body=body,
             decorators=decorators
+        )
+
+    def parse_function_expression(self):
+
+        func = self.match(TokenType.FUNC)
+
+        self.match(TokenType.LPAREN)
+
+        params = []
+        defaults = {}
+
+        if self.current().type != TokenType.RPAREN:
+
+            while True:
+
+                param = self.match(TokenType.IDENTIFIER)
+
+                params.append(param.value)
+
+                if self.current().type == TokenType.ASSIGN:
+                    self.advance()
+                    defaults[param.value] = self.parse_expression()
+
+                if self.current().type != TokenType.COMMA:
+                    break
+
+                self.advance()
+
+        self.match(TokenType.RPAREN)
+
+        self.skip_newlines()
+
+        if self.current().type == TokenType.ARROW:
+
+            self.advance()
+
+            expression = self.parse_expression()
+
+            body = Block(
+                line=expression.line,
+                column=expression.column,
+                statements=[
+                    ReturnStatement(
+                        line=expression.line,
+                        column=expression.column,
+                        value=expression
+                    )
+                ]
+            )
+
+        else:
+
+            body = self.parse_block()
+
+        return FunctionExpression(
+            line=func.line,
+            column=func.column,
+            params=params,
+            defaults=defaults,
+            body=body
         )
 
     # def parse_call(self):
@@ -860,16 +995,27 @@ class Parser:
 
             if text[i] == "{":
 
-                end = text.find("}", i)
+                depth = 1
+                end = i + 1
 
-                if end == -1:
+                while end < len(text) and depth > 0:
+
+                    if text[end] == "{":
+                        depth += 1
+
+                    elif text[end] == "}":
+                        depth -= 1
+
+                    end += 1
+
+                if depth != 0:
                     raise WizSyntaxError(
                         "Missing '}' in interpolated string",
                         token.line,
                         token.column
                     )
 
-                expression = text[i + 1:end].strip()
+                expression = text[i + 1:end - 1].strip()
 
                 lexer = Lexer(expression)
                 tokens = lexer.tokenize()
@@ -880,7 +1026,7 @@ class Parser:
 
                 parts.append(node)
 
-                i = end + 1
+                i = end
 
             else:
 

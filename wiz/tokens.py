@@ -21,6 +21,7 @@ class TokenType(Enum):
     BREAK = auto()
     CONTINUE = auto()
     CLASS = auto()
+    EXTENDS = auto()
     IMPORT = auto()
     DECORATOR = auto()
     BEFORE = auto()
@@ -45,6 +46,7 @@ class TokenType(Enum):
 
     EQUAL = auto()       # ==
     NOT_EQUAL = auto()   # !=
+    ARROW = auto()       # =>
 
     GREATER = auto()     # >
     LESS = auto()        # <
@@ -100,6 +102,7 @@ TOKEN_LABELS = {
     TokenType.BREAK: "'break'",
     TokenType.CONTINUE: "'continue'",
     TokenType.CLASS: "'class'",
+    TokenType.EXTENDS: "'extends'",
     TokenType.IMPORT: "'import'",
     TokenType.DECORATOR: "'decorator'",
     TokenType.BEFORE: "'before'",
@@ -119,6 +122,7 @@ TOKEN_LABELS = {
     TokenType.HASH: "'#'",
     TokenType.EQUAL: "'=='",
     TokenType.NOT_EQUAL: "'!='",
+    TokenType.ARROW: "'=>'",
     TokenType.GREATER: "'>'",
     TokenType.LESS: "'<'",
     TokenType.GREATER_EQUAL: "'>='",

@@ -116,6 +116,12 @@ class MemberExpression(Node):
     object: object
     property: str
 
+@dataclass
+class WhenExpression(Node):
+    condition: Node
+    consequent: Node
+    alternate: Node | None = None
+
 # Statements
 
 @dataclass
@@ -165,9 +171,17 @@ class FunctionStatement(Node):
     decorators: list[Decorator]
 
 @dataclass
+class FunctionExpression(Node):
+    params: list
+    defaults: dict
+    body: Block
+    name: str = ""
+
+@dataclass
 class ClassStatement(Node):
     name: str
     body: Block
+    extends: str | None = None
 
 @dataclass
 class DecoratorStatement(Node):

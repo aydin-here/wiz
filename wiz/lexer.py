@@ -24,6 +24,7 @@ KEYWORDS = {
     "break": TokenType.BREAK,
     "continue": TokenType.CONTINUE,
     "class": TokenType.CLASS,
+    "extends": TokenType.EXTENDS,
     "import": TokenType.IMPORT,
     "decorator": TokenType.DECORATOR
 }
@@ -123,12 +124,26 @@ class Lexer:
         return self.make_token(TokenType.STRING, value, line, column)
 
     def interpolated_string(self, line, column):
-        self.advance() # Skipping $
-        self.advance() # Skipping "
+        self.advance()  # Skipping $
+        self.advance()  # Skipping "
 
         start = self.position
 
-        while self.current() is not None and self.current() != '"':
+        depth = 0
+
+        while self.current() is not None:
+
+            char = self.current()
+
+            if char == "{":
+                depth += 1
+
+            elif char == "}":
+                depth -= 1
+
+            elif char == '"' and depth == 0:
+                break
+
             self.advance()
 
         value = self.source[start:self.position]
@@ -189,6 +204,19 @@ class Lexer:
                 tokens.append(
                     self.make_token(
                         TokenType.EQUAL,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
+                self.advance()
+                self.advance()
+                continue
+
+            # =>
+            if char == "=" and self.peek() == ">":
+                tokens.append(
+                    self.make_token(
+                        TokenType.ARROW,
                         line=token_line,
                         column=token_column
                     )

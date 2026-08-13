@@ -3,7 +3,7 @@ from errors import *
 from tokens import TokenType
 from lexer import Lexer
 from parser import Parser
-from runtime import Module, WizClass, WizInstance
+from runtime import Module, WizClass, WizInstance, Super
 from stdlib import STDLIB
 from decorators import *
 from package_manager import MODULES_DIR
@@ -189,6 +189,18 @@ class Interpreter:
         elif node.else_body:
             self.visit(node.else_body)
 
+    def visit_WhenExpression(self, node):
+
+        condition = self.visit(node.condition)
+
+        if condition:
+            return self.visit(node.consequent)
+
+        if node.alternate is not None:
+            return self.visit(node.alternate)
+
+        return None
+
     def visit_SwitchStatement(self, node):
 
         expression = self.visit(node.expression)
@@ -318,9 +330,28 @@ class Interpreter:
 
         self.functions[node.name] = WizFunction(node, self)
 
+    def visit_FunctionExpression(self, node):
+
+        node.closure = self.scopes.copy()
+
+        return WizFunction(node, self)
+
     def visit_ClassStatement(self, node):
 
-        klass = WizClass(node.name, node)
+        parent = None
+
+        if node.extends is not None:
+
+            if node.extends not in self.classes:
+                raise WizNameError(
+                    f"Undefined class '{node.extends}'",
+                    node.line,
+                    node.column
+                )
+
+            parent = self.classes[node.extends]
+
+        klass = WizClass(node.name, node, parent)
 
         klass.define(self)
 
@@ -810,16 +841,63 @@ class Interpreter:
                     *arguments
                 )
 
+        if isinstance(obj, Super):
+
+            parent = obj.klass.parent
+
+            resolved = (
+                parent.find_method(node.method)
+                if parent is not None
+                else None
+            )
+
+            if resolved is None:
+                raise WizRuntimeError(
+                    f"Class '{obj.klass.name}' has no super method '{node.method}'",
+                    node.line,
+                    node.column
+                )
+
+            method, owner = resolved
+
+            scope = self.bind_arguments(method, node)
+
+            scope["self"] = {
+                "value": obj.instance,
+                "mutable": True
+            }
+
+            if owner.parent is not None:
+                scope["super"] = {
+                    "value": Super(owner, obj.instance),
+                    "mutable": True
+                }
+
+            old_scopes = self.scopes
+
+            self.scopes = method.closure + [scope]
+
+            try:
+                return self.visit_Block(method.body, scope)
+
+            except ReturnException as e:
+                return e.value
+
+            finally:
+                self.scopes = old_scopes
+
         if isinstance(obj, WizInstance):
 
-            method = obj.klass.methods.get(node.method)
+            resolved = obj.klass.find_method(node.method)
 
-            if method is None:
+            if resolved is None:
                 raise WizRuntimeError(
                     f"Class '{obj.klass.name}' has no method '{node.method}'",
                     node.line,
                     node.column
                 )
+
+            method, owner = resolved
 
             scope = self.bind_arguments(method, node)
 
@@ -827,6 +905,12 @@ class Interpreter:
                 "value": obj,
                 "mutable": True
             }
+
+            if owner.parent is not None:
+                scope["super"] = {
+                    "value": Super(owner, obj),
+                    "mutable": True
+                }
 
             old_scopes = self.scopes
 
@@ -979,20 +1063,28 @@ class Interpreter:
         # Instance methods
         if isinstance(obj, WizInstance):
 
-            method = obj.klass.methods.get(node.function)
+            resolved = obj.klass.find_method(node.function)
 
-            if method is None:
+            if resolved is None:
                 raise WizRuntimeError(
                     f"Class '{obj.klass.name}' has no method '{node.function}'",
                     node.line,
                     node.column
                 )
 
+            method, owner = resolved
+
             scope = {}
             scope["self"] = {
                 "value": obj,
                 "mutable": True
             }
+
+            if owner.parent is not None:
+                scope["super"] = {
+                    "value": Super(owner, obj),
+                    "mutable": True
+                }
 
             for param, value in zip(
                 method.params,
@@ -1081,6 +1173,11 @@ class Interpreter:
             if node.property in obj.attributes:
                 return obj.attributes[node.property]
 
+            value = obj.klass.find_variable(node.property)
+
+            if value is not None:
+                return value
+
             raise WizMemberError(
                 f"Class '{obj.klass.name}' has no attribute '{node.property}'",
                 node.line,
@@ -1091,14 +1188,38 @@ class Interpreter:
         # Class member access
         if isinstance(obj, WizClass):
 
-            if node.property in obj.variables:
-                return obj.variables[node.property]
+            value = obj.find_variable(node.property)
 
-            if node.property in obj.methods:
-                return obj.methods[node.property]
+            if value is not None:
+                return value
+
+            resolved = obj.find_method(node.property)
+
+            if resolved is not None:
+                return resolved[0]
 
             raise WizMemberError(
                 f"Class '{obj.name}' has no member '{node.property}'",
+                node.line,
+                node.column
+            )
+
+
+        # Super access
+        if isinstance(obj, Super):
+
+            instance = obj.instance
+
+            if node.property in instance.attributes:
+                return instance.attributes[node.property]
+
+            value = obj.klass.find_variable(node.property)
+
+            if value is not None:
+                return value
+
+            raise WizMemberError(
+                f"Class '{obj.klass.name}' has no super member '{node.property}'",
                 node.line,
                 node.column
             )

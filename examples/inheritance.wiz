@@ -1,0 +1,42 @@
+class Animal {
+
+    let kingdom = "Animalia"
+
+    func init(name, sound) {
+        self.name = name
+        self.sound = sound
+    }
+
+    func speak() {
+        echo(self.name + " says " + self.sound)
+    }
+
+    func describe() {
+        echo(self.name + " belongs to " + Animal.kingdom)
+    }
+
+}
+
+class Dog extends Animal {
+
+    func init(name) {
+        super.init(name, "Woof!")
+    }
+
+    func speak() {
+        super.speak()
+        echo("Also wags its tail")
+    }
+
+    func fetch() {
+        echo(self.name + " fetches the ball")
+    }
+
+}
+
+let dog = Dog("Rex")
+
+dog.speak()
+dog.fetch()
+dog.describe()
+echo(Dog.kingdom)

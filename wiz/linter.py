@@ -323,6 +323,22 @@ class Linter:
         self._pop_scope()
         self.function_depth -= 1
 
+    def _node_FunctionExpression(self, node):
+
+        for default in node.defaults.values():
+            self._walk(default)
+
+        self.function_depth += 1
+        self._push_scope()
+
+        for param in node.params:
+            self._declare(param, "param", node.line, node.column)
+
+        self._walk_statements(node.body.statements)
+
+        self._pop_scope()
+        self.function_depth -= 1
+
     def _node_ClassStatement(self, node):
         self._declare(node.name, "class", node.line, node.column, check_unused=False)
 
@@ -409,7 +425,7 @@ class Linter:
             BUILTIN_FUNCTIONS | set(self.defined_functions) | self.defined_classes
         )
 
-        if node.name not in valid:
+        if node.name not in valid and self._find(node.name) is None:
             self._add(
                 "W011",
                 f"Call to undefined function '{node.name}'",
