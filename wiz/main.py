@@ -21,7 +21,7 @@ from package_manager import (
 from linter import Linter
 from ui import Color, Spinner, download, paint, ssl_context, success
 
-VERSION = "0.20.9"
+VERSION = "0.21.9"
 BANNER = """__        ___     
 \ \      / (_)____
  \ \ /\ / /| |_  /
