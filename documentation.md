@@ -545,6 +545,33 @@ mylib.greet("Wiz")
 
 ---
 
+# Self-Update
+
+Wiz can update itself by checking the latest release on GitHub.
+
+Check for a newer release without installing:
+
+```bash
+python3 wiz/main.py update-self --check
+```
+
+Download and apply the latest release:
+
+```bash
+python3 wiz/main.py update-self
+```
+
+`wiz upgrade` is an alias for `wiz update-self`. The update compares the
+current version with the newest release tag on `github.com/aydin-here/wiz`:
+
+- Installed from a compiled binary: the matching platform binary
+  (`wiz-linux`, `wiz-macos`, `wiz-windows.exe`) is downloaded and
+  replaces the running executable.
+- Running from source: the source tarball of that release tag is
+  downloaded and extracted over the `wiz/` package.
+
+---
+
 # Linter
 
 The `lint` command statically analyzes a `.wiz` file without running it:

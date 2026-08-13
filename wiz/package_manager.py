@@ -8,6 +8,7 @@ import urllib.parse
 import urllib.request
 
 from errors import WizError
+from ui import Color, Spinner, download, paint
 
 
 MANIFEST_FILE = "wiz.pkg"
@@ -80,20 +81,13 @@ def parse_spec(spec):
     return owner, repo, tag
 
 
-def _download(url, dest):
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-
-    with urllib.request.urlopen(request) as response:
-        with open(dest, "wb") as file:
-            shutil.copyfileobj(response, file)
-
-
 def _fetch_archive(owner, repo, tag, dest):
     repo_quoted = urllib.parse.quote(repo, safe="")
     temporary = dest + ".tmp"
+    label = f"Downloading {owner}/{repo}"
 
     def try_url(url):
-        _download(url, temporary)
+        download(url, temporary, label=label, user_agent=USER_AGENT)
         os.replace(temporary, dest)
 
     try:
@@ -178,15 +172,14 @@ def _install(spec, base_path, visited, installed):
     staging = tempfile.mkdtemp(prefix="wiz-pkg-")
 
     try:
-        print(f"  Fetching {label}")
-
         tarball = os.path.join(staging, "package.tar.gz")
 
         _fetch_archive(owner, repo, tag, tarball)
 
         extracted = os.path.join(staging, "src")
 
-        _extract(tarball, extracted)
+        with Spinner(f"Extracting {label}"):
+            _extract(tarball, extracted)
 
         name = _package_name_from_dir(extracted, repo)
 
@@ -197,10 +190,14 @@ def _install(spec, base_path, visited, installed):
 
         os.makedirs(target, exist_ok=True)
 
-        for item in os.listdir(extracted):
-            shutil.move(os.path.join(extracted, item), target)
+        with Spinner("Installing"):
+            for item in os.listdir(extracted):
+                shutil.move(os.path.join(extracted, item), target)
 
-        print(f"  Installed '{name}' -> {target}")
+        print(paint(
+            f"  Installed '{name}' -> {target}",
+            Color.GREEN
+        ))
 
         installed[name] = spec
 
@@ -255,7 +252,7 @@ def install_package(spec, base_path="."):
 
     save_manifest(manifest, base_path)
 
-    print(f"  Updated {manifest_path(base_path)}")
+    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
 
 
 def install_all(base_path="."):
@@ -283,7 +280,7 @@ def install_all(base_path="."):
 
     save_manifest(manifest, base_path)
 
-    print(f"  Updated {manifest_path(base_path)}")
+    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
 
 
 def _unpin_spec(spec):
@@ -313,7 +310,7 @@ def update_package(name, base_path="."):
 
     save_manifest(manifest, base_path)
 
-    print(f"  Updated {manifest_path(base_path)}")
+    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
 
 
 def update_all(base_path="."):
@@ -343,7 +340,7 @@ def update_all(base_path="."):
 
     save_manifest(manifest, base_path)
 
-    print(f"  Updated {manifest_path(base_path)}")
+    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
 
 
 def uninstall_package(name, base_path="."):
@@ -363,7 +360,7 @@ def uninstall_package(name, base_path="."):
         removed = True
 
     if removed:
-        print(f"Uninstalled '{name}'")
+        print(paint(f"Uninstalled '{name}'", Color.GREEN))
     else:
         print(f"Package '{name}' is not installed")
 
