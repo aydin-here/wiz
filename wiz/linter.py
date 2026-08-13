@@ -216,7 +216,7 @@ class Linter:
 
             if isinstance(
                 statement,
-                (ReturnStatement, BreakStatement, ContinueStatement)
+                (ReturnStatement, ThrowStatement, BreakStatement, ContinueStatement)
             ):
                 ended = True
 
@@ -379,6 +379,32 @@ class Linter:
             )
 
         self._walk(node.value)
+
+    def _node_ThrowStatement(self, node):
+        self._walk(node.value)
+
+    def _node_TryCatchStatement(self, node):
+
+        self._walk(node.body)
+
+        if node.catch_body is not None:
+
+            self._push_scope()
+
+            if node.catch_variable:
+                self._declare(
+                    node.catch_variable,
+                    "var",
+                    node.line,
+                    node.column
+                )
+
+            self._walk(node.catch_body)
+
+            self._pop_scope()
+
+        if node.finally_body is not None:
+            self._walk(node.finally_body)
 
     def _node_BreakStatement(self, node):
 

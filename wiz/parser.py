@@ -55,6 +55,10 @@ class Parser:
             self.advance()
             return Boolean(line=token.line, column=token.column, value=token.value)
 
+        if token.type == TokenType.NULL:
+            self.advance()
+            return Null(line=token.line, column=token.column)
+
         if token.type == TokenType.LBRACKET:
             return self.parse_list()
 
@@ -121,6 +125,8 @@ class Parser:
 
         expression = self.parse_primary()
 
+        safe = False
+
         while True:
 
             if self.current().type == TokenType.LPAREN:
@@ -184,11 +190,16 @@ class Parser:
                     line=expression.line,
                     column=expression.column,
                     object=expression,
-                    index=index
+                    index=index,
+                    safe=safe
                 )
                 continue
 
-            if self.current().type == TokenType.DOT:
+            if self.current().type == TokenType.DOT or \
+                    self.current().type == TokenType.SAFE_DOT:
+
+                if self.current().type == TokenType.SAFE_DOT:
+                    safe = True
 
                 self.advance()
 
@@ -231,7 +242,8 @@ class Parser:
                             column=name_token.column,
                             object=expression,
                             function=name,
-                            arguments=arguments
+                            arguments=arguments,
+                            safe=safe
                         )
 
                     else:
@@ -241,7 +253,8 @@ class Parser:
                             column=name_token.column,
                             object=expression,
                             method=name,
-                            arguments=arguments
+                            arguments=arguments,
+                            safe=safe
                         )
 
 
@@ -252,7 +265,20 @@ class Parser:
                     line=name_token.line,
                     column=name_token.column,
                     object=expression,
-                    property=name
+                    property=name,
+                    safe=safe
+                )
+
+                continue
+
+            if self.current().type == TokenType.QUESTION:
+
+                self.advance()
+
+                expression = SafeValue(
+                    line=expression.line,
+                    column=expression.column,
+                    value=expression
                 )
 
                 continue
@@ -311,7 +337,27 @@ class Parser:
         return left
 
     def parse_expression(self):
-        return self.parse_or()
+        return self.parse_null_coalesce()
+
+    def parse_null_coalesce(self):
+
+        left = self.parse_or()
+
+        while self.current().type == TokenType.NULL_COALESCE:
+
+            operator = self.current()
+            self.advance()
+
+            right = self.parse_or()
+
+            left = NullCoalesceExpression(
+                line=operator.line,
+                column=operator.column,
+                left=left,
+                right=right
+            )
+
+        return left
 
     def parse_comparison(self):
 
@@ -901,6 +947,70 @@ class Parser:
             value=value
         )
 
+    def parse_throw(self):
+
+        throw_token = self.match(TokenType.THROW)
+
+        value = self.parse_expression()
+
+        return ThrowStatement(
+            line=throw_token.line,
+            column=throw_token.column,
+            value=value
+        )
+
+    def parse_try_catch(self):
+
+        try_token = self.match(TokenType.TRY)
+
+        self.skip_newlines()
+
+        body = self.parse_block()
+
+        catch_variable = None
+        catch_body = None
+        finally_body = None
+
+        self.skip_newlines()
+
+        if self.current().type == TokenType.CATCH:
+
+            self.advance()
+
+            variable = self.match(TokenType.IDENTIFIER)
+
+            catch_variable = variable.value
+
+            self.skip_newlines()
+
+            catch_body = self.parse_block()
+
+            self.skip_newlines()
+
+        if self.current().type == TokenType.FINALLY:
+
+            self.advance()
+
+            self.skip_newlines()
+
+            finally_body = self.parse_block()
+
+        if catch_body is None and finally_body is None:
+            raise WizSyntaxError(
+                "A 'try' block must be followed by 'catch' or 'finally'",
+                try_token.line,
+                try_token.column
+            )
+
+        return TryCatchStatement(
+            line=try_token.line,
+            column=try_token.column,
+            body=body,
+            catch_variable=catch_variable,
+            catch_body=catch_body,
+            finally_body=finally_body
+        )
+
     def parse_block(self):
 
         self.match(TokenType.LBRACE)
@@ -1299,6 +1409,12 @@ class Parser:
 
         if self.current().type == TokenType.RETURN:
             return self.parse_return()
+
+        if self.current().type == TokenType.THROW:
+            return self.parse_throw()
+
+        if self.current().type == TokenType.TRY:
+            return self.parse_try_catch()
 
         if self.current().type == TokenType.RBRACE:
             return None

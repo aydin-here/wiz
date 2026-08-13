@@ -10,6 +10,23 @@ from package_manager import MODULES_DIR
 import os
 
 
+def to_display(value, nested=False):
+    if value is None:
+        return "null"
+    if isinstance(value, list):
+        return "[" + ", ".join(
+            to_display(item, True) for item in value
+        ) + "]"
+    if isinstance(value, dict):
+        return "{" + ", ".join(
+            to_display(key, True) + ": " + to_display(item, True)
+            for key, item in value.items()
+        ) + "}"
+    if isinstance(value, str):
+        return repr(value) if nested else value
+    return str(value)
+
+
 class ReturnException(Exception):
 
     def __init__(self, value):
@@ -46,11 +63,11 @@ class Interpreter:
         self.modules = {}
         self.base_path = base_path
         self.builtins = {
-            "str": str,
+            "str": to_display,
             "num": int,
             "bool": bool,
             "len": len,
-            "echo": print,
+            "echo": self._echo,
             "get": input,
         }
         self.decorators = {
@@ -94,6 +111,9 @@ class Interpreter:
                 "strip": lambda obj, *args: obj.strip(*args),
             },
         }
+
+    def _echo(self, *args, **kwargs):
+        print(*(to_display(arg) for arg in args), **kwargs)
 
     def visit(self, node):
 
@@ -173,12 +193,6 @@ class Interpreter:
 
         variable["value"] = value
 
-    def visit_EchoStatement(self, node):
-
-        value = self.visit(node.value)
-
-        print(value)
-
     def visit_WhenStatement(self, node):
     
         condition = self.visit(node.condition)
@@ -200,6 +214,24 @@ class Interpreter:
             return self.visit(node.alternate)
 
         return None
+
+    def visit_NullCoalesceExpression(self, node):
+
+        left = self.visit(node.left)
+
+        if left is None:
+            return self.visit(node.right)
+
+        return left
+
+    def visit_SafeValue(self, node):
+
+        value = self.visit(node.value)
+
+        if value is None:
+            return "null"
+
+        return value
 
     def visit_SwitchStatement(self, node):
 
@@ -367,6 +399,53 @@ class Interpreter:
 
         raise ReturnException(value)
 
+    def visit_ThrowStatement(self, node):
+
+        value = self.visit(node.value)
+
+        raise WizThrowError(
+            to_display(value),
+            node.line,
+            node.column,
+            value=value
+        )
+
+    def visit_TryCatchStatement(self, node):
+
+        try:
+            self.visit(node.body)
+
+        except WizThrowError as error:
+
+            if node.catch_body is not None:
+
+                scope = {
+                    node.catch_variable: {
+                        "value": error.value,
+                        "mutable": True
+                    }
+                }
+
+                self.visit_Block(node.catch_body, scope)
+
+        except WizError as error:
+
+            if node.catch_body is not None:
+
+                scope = {
+                    node.catch_variable: {
+                        "value": error.message,
+                        "mutable": True
+                    }
+                }
+
+                self.visit_Block(node.catch_body, scope)
+
+        finally:
+
+            if node.finally_body is not None:
+                self.visit_Block(node.finally_body)
+
     def visit_BreakStatement(self, node):
         raise BreakException()
 
@@ -513,7 +592,7 @@ class Interpreter:
 
             value = self.visit(part)
 
-            result.append(str(value))
+            result.append(to_display(value))
 
         return "".join(result)
 
@@ -522,6 +601,9 @@ class Interpreter:
 
     def visit_Boolean(self, node):
         return node.value
+
+    def visit_Null(self, node):
+        return None
 
     def visit_Argument(self, node):
         return self.visit(node.value)
@@ -573,6 +655,10 @@ class Interpreter:
         right = self.visit(node.right)
 
         if node.operator == TokenType.PLUS:
+            if isinstance(left, str) and right is None:
+                return left
+            if isinstance(right, str) and left is None:
+                return right
             return left + right
 
         if node.operator == TokenType.MINUS:
@@ -637,6 +723,18 @@ class Interpreter:
                     args.append(value)
                 else:
                     kwargs[argument.name] = value
+
+            if node.name == "echo":
+
+                for value in args:
+
+                    if value is None:
+                        raise WizNullError(
+                            f"Cannot echo a null value; "
+                            "use '?' to print it",
+                            node.line,
+                            node.column
+                        )
 
             return self.builtins[node.name](*args, **kwargs)
 
@@ -791,6 +889,10 @@ class Interpreter:
     def visit_IndexExpression(self, node):
 
         obj = self.visit(node.object)
+
+        if node.safe and obj is None:
+            return None
+
         index = self.visit(node.index)
 
         try:
@@ -824,6 +926,9 @@ class Interpreter:
     def visit_MethodCallExpression(self, node):
 
         obj = self.visit(node.object)
+
+        if node.safe and obj is None:
+            return None
 
         if type(obj).__name__ == "DecoratorContext":
 
@@ -1004,6 +1109,9 @@ class Interpreter:
 
         obj = self.visit(node.object)
 
+        if node.safe and obj is None:
+            return None
+
         args = []
         kwargs = {}
 
@@ -1139,6 +1247,21 @@ class Interpreter:
 
         obj = self.visit(node.object)
 
+        if node.safe and obj is None:
+            return None
+
+        # Dictionary access
+        if isinstance(obj, dict):
+
+            if node.property in obj:
+                return obj[node.property]
+
+            raise WizKeyError(
+                f"Key '{node.property}' not found",
+                node.line,
+                node.column
+            )
+
         # Module access
         if hasattr(obj, "get"):
 
@@ -1152,19 +1275,6 @@ class Interpreter:
                 )
 
             return value
-
-
-        # Dictionary access
-        if isinstance(obj, dict):
-
-            if node.property in obj:
-                return obj[node.property]
-
-            raise WizKeyError(
-                f"Key '{node.property}' not found",
-                node.line,
-                node.column
-            )
 
 
         # Instance attribute access

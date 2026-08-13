@@ -1,0 +1,36 @@
+// Exceptions: try / catch / finally / throw
+
+func divide(a, b) {
+    when b == 0 {
+        throw "cannot divide by zero"
+    }
+    return a / b
+}
+
+try {
+    echo(divide(10, 0))
+}
+catch err {
+    echo("caught: " + err)
+}
+finally {
+    echo("cleanup done")
+}
+
+try {
+    echo(divide(10, 2))
+}
+catch err {
+    echo("should not run")
+}
+
+// Catching runtime errors too
+try {
+    let nums = [1, 2, 3]
+    echo(nums[50])
+}
+catch err {
+    echo("error caught: " + err)
+}
+
+echo("done")

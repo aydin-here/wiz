@@ -1,0 +1,30 @@
+// Null and null safety
+
+let nick = null
+
+echo(nick?)
+
+echo(nick ?? "unknown")
+
+let name = "Aydin"
+echo(name ?? "fallback")
+
+let user = {
+    "name": "Aydin"
+}
+
+let empty = null
+
+echo(empty?.name ?? "no user")
+
+echo(user?.name)
+
+echo(user?.name?)
+
+echo(empty?.name.length ?? 0)
+
+var count = 0
+when empty != null {
+    count = 1
+}
+echo(count)

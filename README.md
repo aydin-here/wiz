@@ -34,9 +34,12 @@ The language currently contains:
 * Runtime
 * Module System
 * Decorator System
+* Exceptions (try / catch / finally)
+* Null Safety (null, ??, ?.)
 * Standard Library
 * Package Manager
 * Static Linter
+* Formatter
 * VSCode Extension
 
 Everything is written using pure Python.
@@ -119,6 +122,77 @@ and
 or
 not
 ```
+
+### Null Safety
+
+`null` represents the absence of a value. The `??` operator returns the
+left side unless it is `null`, and `?.` safely navigates members, methods
+and indexes of possibly-`null` values.
+
+```wiz
+let name = null
+
+echo(name ?? "unknown")    // unknown
+
+let user = null
+
+echo(user?.name ?? "guest")    // guest
+
+echo(user?.name.upper())       // null (whole chain is safe)
+```
+
+A null value cannot be echoed directly. A trailing `?` marks a value as
+safe to print, so the interpreter prints it as `null` instead of raising
+a null error:
+
+```wiz
+let nick = null
+
+echo(nick)    // Null Error: Cannot echo a null value
+echo(nick?)   // null
+
+let name = "Aydin"
+echo(name?)   // Aydin
+
+echo("a" + nick)    // a
+echo("a" + nick?)   // anull
+```
+
+The null error is ordinary and can be caught with `try` / `catch`.
+
+---
+
+## Exceptions
+
+Wiz supports error handling with `try`, `catch`, `finally` and `throw`.
+
+```wiz
+func divide(a, b) {
+    when b == 0 {
+        throw "cannot divide by zero"
+    }
+    return a / b
+}
+
+try {
+    echo(divide(10, 0))
+}
+catch err {
+    echo("caught: " + err)
+}
+finally {
+    echo("cleanup done")
+}
+```
+
+* `throw` raises any value; the message is the value's string form.
+* `catch <name>` binds the caught error to a variable.
+* `finally` always runs, even when an error, `return`, `break` or
+  `continue` passes through.
+* Runtime errors (bad index, unknown key, type errors, ...) are also
+  catchable inside a `try` block.
+
+`finally` on its own (without `catch`) is allowed.
 
 ---
 
@@ -762,6 +836,18 @@ Lint
 python wiz/main.py lint hello.wiz
 ```
 
+Format
+
+```bash
+python wiz/main.py format hello.wiz
+```
+
+Prints the formatted source to stdout. Pass `-w` to overwrite the file:
+
+```bash
+python wiz/main.py format hello.wiz -w
+```
+
 Help
 
 ```bash
@@ -776,17 +862,22 @@ python wiz/main.py help
 examples/
 
 ├── calculator.wiz
+├── classes.wiz
 ├── decorators.wiz
 ├── dictionaries.wiz
+├── exceptions.wiz
 ├── files.wiz
-├── for.wiz
+├── for_loop.wiz
 ├── functions.wiz
 ├── hello.wiz
-├── interpolation.wiz
+├── inheritance.wiz
+├── interpolated_strings.wiz
 ├── lists.wiz
 ├── modules.wiz
 ├── named_arguments.wiz
-├── switch.wiz
+├── null_safety.wiz
+├── one_line.wiz
+├── switch_case.wiz
 ├── variables.wiz
 └── while.wiz
 ```
@@ -850,13 +941,11 @@ Upcoming features
 * Interfaces
 * Enums
 * Pattern Matching
-* Exceptions
 * Lambdas
 * Bytecode Compiler
 * Virtual Machine
 * REPL
 * Debugger
-* Formatter
 * Package Registry
 * Language Server Protocol (LSP)
 

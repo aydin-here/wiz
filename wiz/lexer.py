@@ -26,7 +26,12 @@ KEYWORDS = {
     "class": TokenType.CLASS,
     "extends": TokenType.EXTENDS,
     "import": TokenType.IMPORT,
-    "decorator": TokenType.DECORATOR
+    "decorator": TokenType.DECORATOR,
+    "try": TokenType.TRY,
+    "catch": TokenType.CATCH,
+    "finally": TokenType.FINALLY,
+    "throw": TokenType.THROW,
+    "null": TokenType.NULL
 }
 
 
@@ -236,6 +241,45 @@ class Lexer:
                     )
                 )
                 self.advance()
+                self.advance()
+                continue
+
+
+            # ??
+            if char == "?" and self.peek() == "?":
+                tokens.append(
+                    self.make_token(
+                        TokenType.NULL_COALESCE,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
+                self.advance()
+                self.advance()
+                continue
+
+            # ?.
+            if char == "?" and self.peek() == ".":
+                tokens.append(
+                    self.make_token(
+                        TokenType.SAFE_DOT,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
+                self.advance()
+                self.advance()
+                continue
+
+            # ?
+            if char == "?":
+                tokens.append(
+                    self.make_token(
+                        TokenType.QUESTION,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 

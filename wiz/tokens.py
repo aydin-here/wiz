@@ -27,6 +27,11 @@ class TokenType(Enum):
     BEFORE = auto()
     AFTER = auto()
     ERROR = auto()
+    TRY = auto()
+    CATCH = auto()
+    FINALLY = auto()
+    THROW = auto()
+    NULL = auto()
 
     # Literals
     IDENTIFIER = auto()
@@ -47,6 +52,9 @@ class TokenType(Enum):
     EQUAL = auto()       # ==
     NOT_EQUAL = auto()   # !=
     ARROW = auto()       # =>
+    NULL_COALESCE = auto()  # ??
+    SAFE_DOT = auto()    # ?.
+    QUESTION = auto()    # ?
 
     GREATER = auto()     # >
     LESS = auto()        # <
@@ -108,6 +116,11 @@ TOKEN_LABELS = {
     TokenType.BEFORE: "'before'",
     TokenType.AFTER: "'after'",
     TokenType.ERROR: "'error'",
+    TokenType.TRY: "'try'",
+    TokenType.CATCH: "'catch'",
+    TokenType.FINALLY: "'finally'",
+    TokenType.THROW: "'throw'",
+    TokenType.NULL: "'null'",
     TokenType.IDENTIFIER: "a name",
     TokenType.NUMBER: "a number",
     TokenType.STRING: "a string",
@@ -123,6 +136,9 @@ TOKEN_LABELS = {
     TokenType.EQUAL: "'=='",
     TokenType.NOT_EQUAL: "'!='",
     TokenType.ARROW: "'=>'",
+    TokenType.NULL_COALESCE: "'??'",
+    TokenType.SAFE_DOT: "'?.'",
+    TokenType.QUESTION: "'?'",
     TokenType.GREATER: "'>'",
     TokenType.LESS: "'<'",
     TokenType.GREATER_EQUAL: "'>='",

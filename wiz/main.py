@@ -1,9 +1,11 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
+import textwrap
 import urllib.error
 import urllib.request
 from lexer import Lexer
@@ -19,9 +21,10 @@ from package_manager import (
     list_packages
 )
 from linter import Linter
+from formatter import Formatter
 from ui import Color, Spinner, download, paint, ssl_context, success
 
-VERSION = "0.21.9"
+VERSION = "0.22.2"
 BANNER = """__        ___     
 \ \      / (_)____
  \ \ /\ / /| |_  /
@@ -68,6 +71,8 @@ Commands:
     tokens <file.wiz>             Print lexer tokens
     ast <file.wiz>                Print parsed AST
     lint <file.wiz>               Statically analyze a Wiz file
+    format <file.wiz>             Format a Wiz file (print to stdout)
+    format <file.wiz> -w          Format and overwrite the file in place
     install [owner/repo[@tag]]    Install all dependencies or a package
     update [package]              Update all packages or a specific one
     -U, upgrade                   Update Wiz itself from GitHub
@@ -171,16 +176,7 @@ def _update_source(tag):
         if not os.path.isdir(source):
             raise WizError("Downloaded source has no 'wiz' package.")
 
-        for item in os.listdir(source):
-
-            src = os.path.join(source, item)
-            dest = os.path.join(root, item)
-
-            if os.path.isdir(src):
-                shutil.rmtree(dest, ignore_errors=True)
-                shutil.copytree(src, dest)
-            else:
-                shutil.copy2(src, dest)
+        _commit_source(source, root)
 
         success(f"  Updated source to {tag}.")
         return True
@@ -189,12 +185,134 @@ def _update_source(tag):
         shutil.rmtree(staging, ignore_errors=True)
 
 
-def _replace_executable(exe, new_path):
+SUDO_PROMPT = "[sudo] password for %u: "
+
+_PRIVILEGED_COPY = textwrap.dedent("""\
+    import os
+    import shutil
+    import sys
+
+    source, root = sys.argv[1], sys.argv[2]
+
+    for item in os.listdir(source):
+        src = os.path.join(source, item)
+        dest = os.path.join(root, item)
+
+        if os.path.isdir(src):
+            shutil.rmtree(dest, ignore_errors=True)
+            shutil.copytree(src, dest)
+        else:
+            shutil.copy2(src, dest)
+""")
+
+
+def _is_writable(path):
+    probe = os.path.join(path, ".wiz-write-probe")
+
     try:
-        os.replace(new_path, exe)
+        fd = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+        os.close(fd)
+        os.remove(probe)
         return True
     except OSError:
         return False
+
+
+def _run_privileged(args):
+    try:
+        result = subprocess.run(
+            ["sudo", "-p", SUDO_PROMPT, *args]
+        )
+    except OSError:
+        print("  'sudo' is not available on this system.")
+        return False
+
+    return result.returncode == 0
+
+
+def _commit_source(source, root):
+    if _is_writable(root):
+        for item in os.listdir(source):
+            src = os.path.join(source, item)
+            dest = os.path.join(root, item)
+
+            if os.path.isdir(src):
+                shutil.rmtree(dest, ignore_errors=True)
+                shutil.copytree(src, dest)
+            else:
+                shutil.copy2(src, dest)
+        return
+
+    print(paint(
+        f"  '{root}' is not writable; updating it requires elevated rights.",
+        Color.BOLD
+    ))
+
+    if _run_privileged(
+        [sys.executable, "-c", _PRIVILEGED_COPY, source, root]
+    ):
+        return
+
+    raise WizError(
+        f"Cannot write to '{root}'. Request elevated permissions "
+        "and run 'wiz -U' again (e.g. 'sudo wiz -U')."
+    )
+
+
+def _update_frozen(tag, assets):
+    asset = _platform_asset()
+
+    if asset not in assets:
+        raise WizError(
+            f"No '{asset}' binary in release {tag}."
+        )
+
+    exe = os.path.abspath(sys.executable)
+
+    staging = tempfile.mkdtemp(prefix="wiz-update-")
+
+    try:
+        new_path = os.path.join(staging, os.path.basename(exe))
+
+        try:
+            download(assets[asset], new_path, label=f"Downloading {asset}")
+        except (urllib.error.URLError, OSError) as error:
+            raise WizError(f"Download failed: {error}")
+
+        os.chmod(new_path, 0o755)
+
+        try:
+            os.replace(new_path, exe)
+            success(f"  Updated to {tag}. Restart wiz to use it.")
+            return True
+        except OSError:
+            pass
+
+        print(f"  '{exe}' is not writable; updating it requires elevated rights.")
+
+        if _run_privileged(["install", "-m", "0755", new_path, exe]):
+            success(f"  Updated to {tag}. Restart wiz to use it.")
+            return True
+
+        fallback_dir = os.path.join(
+            os.path.expanduser("~"), ".wiz", "updates"
+        )
+
+        os.makedirs(fallback_dir, exist_ok=True)
+
+        fallback = os.path.join(fallback_dir, f"wiz-{tag}")
+
+        shutil.copy2(new_path, fallback)
+
+        print(
+            f"  New binary saved to '{fallback}'.\n"
+            "  Move it over the current wiz executable to finish:\n"
+            f"    sudo install -m 0755 '{fallback}' '{exe}'"
+        )
+        return False
+
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def update_self(check_only=False):
@@ -217,36 +335,7 @@ def update_self(check_only=False):
         return True
 
     if getattr(sys, "frozen", False):
-        asset = _platform_asset()
-
-        if asset not in assets:
-            raise WizError(
-                f"No '{asset}' binary in release {tag}."
-            )
-
-        exe = os.path.abspath(sys.executable)
-
-        new_path = exe + ".new"
-
-        try:
-            download(assets[asset], new_path, label=f"Downloading {asset}")
-        except (urllib.error.URLError, OSError) as error:
-            if os.path.exists(new_path):
-                os.remove(new_path)
-            raise WizError(f"Download failed: {error}")
-
-        os.chmod(new_path, 0o755)
-
-        if _replace_executable(exe, new_path):
-            success(f"  Updated to {tag}. Restart wiz to use it.")
-        else:
-            print(
-                f"  New binary saved to '{new_path}'.\n"
-                "  The running executable could not be replaced.\n"
-                "  Move it over the current wiz executable to finish."
-            )
-
-        return True
+        return _update_frozen(tag, assets)
 
     return _update_source(tag)
 
@@ -344,6 +433,27 @@ def lint(filename):
     print(f"  {summary} found")
 
 
+def format_file(filename, write=False):
+    source = load_file(filename)
+
+    try:
+        formatter = Formatter(source)
+        formatted = formatter.format()
+    except WizError as error:
+        error.attach_source(source)
+        error.filename = filename
+        print(error)
+        sys.exit(1)
+
+    if write:
+        with open(filename, "w", encoding="utf-8") as file:
+            file.write(formatted)
+        print(f"  {filename}: formatted")
+        return
+
+    print(formatted, end="")
+
+
 def main():
 
     if len(sys.argv) < 2:
@@ -416,6 +526,14 @@ def main():
         except WizError as error:
             print(f"Error: {error.message}")
             sys.exit(1)
+        return
+
+    if command == "format":
+        if len(sys.argv) not in (3, 4):
+            print("Usage: wiz format <file.wiz> [-w]")
+            return
+        write = len(sys.argv) == 4 and sys.argv[3] in ("-w", "--write")
+        format_file(sys.argv[2], write)
         return
 
     if len(sys.argv) != 3:

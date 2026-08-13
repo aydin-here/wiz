@@ -166,3 +166,15 @@ class WizVariableDeclared(WizError):
 
 class WizParameterError(WizError):
     label = "Parameter Error"
+
+
+class WizNullError(WizError):
+    label = "Null Error"
+
+
+class WizThrowError(WizError):
+    label = "Throw Error"
+
+    def __init__(self, message, line=None, column=None, value=None):
+        super().__init__(message, line, column)
+        self.value = value

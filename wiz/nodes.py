@@ -59,6 +59,10 @@ class Number(Node):
 class Boolean(Node):
     value: bool
 
+@dataclass
+class Null(Node):
+    pass
+
 # Expressions
 
 @dataclass
@@ -88,12 +92,14 @@ class UnaryExpression(Node):
 class IndexExpression(Node):
     object: any
     index: any
+    safe: bool = False
 
 @dataclass
 class MethodCallExpression(Node):
     object: any
     method: str
     arguments: list
+    safe: bool = False
 
 @dataclass
 class CallExpression(Node):
@@ -105,6 +111,7 @@ class MemberCallExpression(Node):
     object: object
     function: str
     arguments: list[Argument]
+    safe: bool = False
 
 @dataclass
 class FunctionCallExpression(Node):
@@ -115,12 +122,22 @@ class FunctionCallExpression(Node):
 class MemberExpression(Node):
     object: object
     property: str
+    safe: bool = False
 
 @dataclass
 class WhenExpression(Node):
     condition: Node
     consequent: Node
     alternate: Node | None = None
+
+@dataclass
+class NullCoalesceExpression(Node):
+    left: Node
+    right: Node
+
+@dataclass
+class SafeValue(Node):
+    value: Node
 
 # Statements
 
@@ -196,6 +213,17 @@ class DecoratorStatement(Node):
 @dataclass
 class ReturnStatement(Node):
     value: Node
+
+@dataclass
+class ThrowStatement(Node):
+    value: Node
+
+@dataclass
+class TryCatchStatement(Node):
+    body: Block
+    catch_variable: str | None
+    catch_body: Block | None
+    finally_body: Block | None
 
 @dataclass
 class BreakStatement(Node):
