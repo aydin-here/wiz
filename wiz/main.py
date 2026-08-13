@@ -19,9 +19,9 @@ from package_manager import (
     list_packages
 )
 from linter import Linter
-from ui import Color, Spinner, download, paint, success
+from ui import Color, Spinner, download, paint, ssl_context, success
 
-VERSION = "0.20.8"
+VERSION = "0.20.9"
 BANNER = """__        ___     
 \ \      / (_)____
  \ \ /\ / /| |_  /
@@ -103,7 +103,9 @@ def _request(url):
         url,
         headers={"User-Agent": USER_AGENT}
     )
-    return urllib.request.urlopen(request, timeout=20)
+    context = ssl_context()
+
+    return urllib.request.urlopen(request, timeout=20, context=context)
 
 
 def latest_release():

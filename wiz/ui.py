@@ -1,4 +1,5 @@
 import os
+import ssl
 import sys
 import threading
 import time
@@ -10,6 +11,29 @@ if os.name == "nt":
 ENABLED = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 
 CHUNK = 64 * 1024
+
+CA_BUNDLES = (
+    "/etc/ssl/certs/ca-certificates.crt",
+    "/etc/ssl/cert.pem",
+    "/etc/ssl/ca-bundle.pem",
+    "/etc/pki/tls/certs/ca-bundle.crt",
+    "/etc/pki/tls/cacert.pem",
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+)
+
+
+def ssl_context():
+    context = ssl.create_default_context()
+
+    for bundle in CA_BUNDLES:
+        if os.path.exists(bundle):
+            try:
+                context.load_verify_locations(cafile=bundle)
+                break
+            except (OSError, ssl.SSLError):
+                continue
+
+    return context
 
 
 class Color:
@@ -190,7 +214,8 @@ def download(url, dest, label="Downloading", timeout=20, user_agent="wiz-updater
     bar = None
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout,
+                                    context=ssl_context()) as response:
             raw = response.headers.get("Content-Length")
             total = int(raw) if raw else 0
 
