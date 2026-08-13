@@ -9,8 +9,8 @@
 // Re-declare variable
 // ======================================
 
-// let age = 10
-// let age = 20
+//let age = 10
+//let age = 20
 
 
 // ======================================
@@ -27,7 +27,7 @@
 
 // func hello(name)
 // {
-//     echo(name)
+//      echo(name)
 // }
 
 // hello()

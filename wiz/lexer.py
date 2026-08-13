@@ -1,4 +1,5 @@
 from tokens import Token, TokenType
+from errors import WizSyntaxError
 
 
 KEYWORDS = {
@@ -59,15 +60,15 @@ class Lexer:
 
         return char
 
-    def make_token(self, token_type, value=None):
+    def make_token(self, token_type, value=None, line=None, column=None):
         return Token(
             token_type,
             value,
-            self.line,
-            self.column,
+            self.line if line is None else line,
+            self.column if column is None else column,
         )
 
-    def identifier(self):
+    def identifier(self, line, column):
         start = self.position
 
         while self.current() is not None and (
@@ -82,18 +83,22 @@ class Lexer:
         if token_type == TokenType.BOOLEAN:
             return self.make_token(
                 TokenType.BOOLEAN,
-                text == "true"
+                text == "true",
+                line,
+                column
             )
 
         if token_type is not None:
-            return self.make_token(token_type)
+            return self.make_token(token_type, line=line, column=column)
 
         return self.make_token(
             TokenType.IDENTIFIER,
-            text
+            text,
+            line,
+            column
         )
 
-    def number(self):
+    def number(self, line, column):
         start = self.position
 
         while self.current() is not None and self.current().isdigit():
@@ -101,9 +106,9 @@ class Lexer:
 
         value = self.source[start:self.position]
 
-        return self.make_token(TokenType.NUMBER, int(value))
+        return self.make_token(TokenType.NUMBER, int(value), line, column)
 
-    def string(self):
+    def string(self, line, column):
         self.advance()  # Skipping "
 
         start = self.position
@@ -115,9 +120,9 @@ class Lexer:
 
         self.advance()  # Skipping "
 
-        return self.make_token(TokenType.STRING, value)
+        return self.make_token(TokenType.STRING, value, line, column)
 
-    def interpolated_string(self):
+    def interpolated_string(self, line, column):
         self.advance() # Skipping $
         self.advance() # Skipping "
 
@@ -130,13 +135,15 @@ class Lexer:
 
         self.advance()  # Skipping "
 
-        return self.make_token(TokenType.INTERPOLATED_STRING, value)
+        return self.make_token(TokenType.INTERPOLATED_STRING, value, line, column)
 
     def tokenize(self):
         tokens = []
 
         while self.current() is not None:
             char = self.current()
+
+            token_line, token_column = self.line, self.column
 
             # Space
             if char in " \t":
@@ -145,34 +152,46 @@ class Lexer:
 
             # New Line
             if char == "\n":
-                tokens.append(self.make_token(TokenType.NEWLINE))
+                tokens.append(
+                    self.make_token(
+                        TokenType.NEWLINE,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             # Variable or Keyword
             if char.isalpha() or char == "_":
-                tokens.append(self.identifier())
+                tokens.append(self.identifier(token_line, token_column))
                 continue
 
             # Number
             if char.isdigit():
-                tokens.append(self.number())
+                tokens.append(self.number(token_line, token_column))
                 continue
 
             # Interpolated String
             if char == "$" and self.peek() == '"':
-                tokens.append(self.interpolated_string())
+                tokens.append(
+                    self.interpolated_string(token_line, token_column)
+                )
                 continue
 
             # String
             if char == '"':
-                tokens.append(self.string())
+                tokens.append(self.string(token_line, token_column))
                 continue
 
             # ==
             if char == "=" and self.peek() == "=":
                 tokens.append(
-                    self.make_token(TokenType.EQUAL)
+                    self.make_token(
+                        TokenType.EQUAL,
+                        line=token_line,
+                        column=token_column
+                    )
                 )
                 self.advance()
                 self.advance()
@@ -182,7 +201,11 @@ class Lexer:
             # !=
             if char == "!" and self.peek() == "=":
                 tokens.append(
-                    self.make_token(TokenType.NOT_EQUAL)
+                    self.make_token(
+                        TokenType.NOT_EQUAL,
+                        line=token_line,
+                        column=token_column
+                    )
                 )
                 self.advance()
                 self.advance()
@@ -192,7 +215,11 @@ class Lexer:
             # >=
             if char == ">" and self.peek() == "=":
                 tokens.append(
-                    self.make_token(TokenType.GREATER_EQUAL)
+                    self.make_token(
+                        TokenType.GREATER_EQUAL,
+                        line=token_line,
+                        column=token_column
+                    )
                 )
                 self.advance()
                 self.advance()
@@ -202,7 +229,11 @@ class Lexer:
             # <=
             if char == "<" and self.peek() == "=":
                 tokens.append(
-                    self.make_token(TokenType.LESS_EQUAL)
+                    self.make_token(
+                        TokenType.LESS_EQUAL,
+                        line=token_line,
+                        column=token_column
+                    )
                 )
                 self.advance()
                 self.advance()
@@ -211,7 +242,11 @@ class Lexer:
             # >
             if char == ">":
                 tokens.append(
-                    self.make_token(TokenType.GREATER)
+                    self.make_token(
+                        TokenType.GREATER,
+                        line=token_line,
+                        column=token_column
+                    )
                 )
                 self.advance()
                 continue
@@ -220,86 +255,180 @@ class Lexer:
             # <
             if char == "<":
                 tokens.append(
-                    self.make_token(TokenType.LESS)
+                    self.make_token(
+                        TokenType.LESS,
+                        line=token_line,
+                        column=token_column
+                    )
                 )
                 self.advance()
                 continue
 
             # =
             if char == "=":
-                tokens.append(self.make_token(TokenType.ASSIGN))
+                tokens.append(
+                    self.make_token(
+                        TokenType.ASSIGN,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             # (
             if char == "(":
-                tokens.append(self.make_token(TokenType.LPAREN))
+                tokens.append(
+                    self.make_token(
+                        TokenType.LPAREN,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             # )
             if char == ")":
-                tokens.append(self.make_token(TokenType.RPAREN))
+                tokens.append(
+                    self.make_token(
+                        TokenType.RPAREN,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "#":
-                tokens.append(self.make_token(TokenType.HASH))
+                tokens.append(
+                    self.make_token(
+                        TokenType.HASH,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == ",":
-                tokens.append(self.make_token(TokenType.COMMA))
+                tokens.append(
+                    self.make_token(
+                        TokenType.COMMA,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == ".":
                 if self.peek() == ".":
-                    tokens.append(self.make_token(TokenType.RANGE))
+                    tokens.append(
+                        self.make_token(
+                            TokenType.RANGE,
+                            line=token_line,
+                            column=token_column
+                        )
+                    )
                     self.advance()
                     self.advance()
                     continue
-                tokens.append(self.make_token(TokenType.DOT))
+                tokens.append(
+                    self.make_token(
+                        TokenType.DOT,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == ":":
-                tokens.append(self.make_token(TokenType.COLON))
+                tokens.append(
+                    self.make_token(
+                        TokenType.COLON,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "{":
-                tokens.append(self.make_token(TokenType.LBRACE))
+                tokens.append(
+                    self.make_token(
+                        TokenType.LBRACE,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "}":
-                tokens.append(self.make_token(TokenType.RBRACE))
+                tokens.append(
+                    self.make_token(
+                        TokenType.RBRACE,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "[":
-                tokens.append(self.make_token(TokenType.LBRACKET))
+                tokens.append(
+                    self.make_token(
+                        TokenType.LBRACKET,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "]":
-                tokens.append(self.make_token(TokenType.RBRACKET))
+                tokens.append(
+                    self.make_token(
+                        TokenType.RBRACKET,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "+":
-                tokens.append(self.make_token(TokenType.PLUS))
+                tokens.append(
+                    self.make_token(
+                        TokenType.PLUS,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "-":
-                tokens.append(self.make_token(TokenType.MINUS))
+                tokens.append(
+                    self.make_token(
+                        TokenType.MINUS,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "*":
-                tokens.append(self.make_token(TokenType.STAR))
+                tokens.append(
+                    self.make_token(
+                        TokenType.STAR,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
@@ -329,19 +458,39 @@ class Lexer:
                 continue
 
             if char == "/":
-                tokens.append(self.make_token(TokenType.SLASH))
+                tokens.append(
+                    self.make_token(
+                        TokenType.SLASH,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
             if char == "%":
-                tokens.append(self.make_token(TokenType.MODULO))
+                tokens.append(
+                    self.make_token(
+                        TokenType.MODULO,
+                        line=token_line,
+                        column=token_column
+                    )
+                )
                 self.advance()
                 continue
 
-            raise Exception(
-                f"Unexpected character '{char}' at line {self.line}"
+            raise WizSyntaxError(
+                f"Unexpected character '{char}'",
+                token_line,
+                token_column
             )
 
-        tokens.append(self.make_token(TokenType.EOF))
+        tokens.append(
+            self.make_token(
+                TokenType.EOF,
+                line=self.line,
+                column=self.column
+            )
+        )
 
         return tokens

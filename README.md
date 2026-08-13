@@ -35,6 +35,8 @@ The language currently contains:
 * Module System
 * Decorator System
 * Standard Library
+* Package Manager
+* Static Linter
 * VSCode Extension
 
 Everything is written using pure Python.
@@ -313,6 +315,12 @@ Decorators can also be written directly in Wiz.
 ```wiz
 decorator on_command(command) {
 
+    define(ctx) {
+
+        echo($"Registering {ctx.function.name}")
+
+    }
+
     before(ctx) {
 
         echo("Executing command")
@@ -350,11 +358,12 @@ start()
 
 ### Available Hooks
 
-| Hook   | Description                              |
-| ------ | ---------------------------------------- |
-| before | Executed before the function             |
-| after  | Executed after the function              |
-| error  | Executed if the function throws an error |
+| Hook   | Description                                            |
+| ------ | ------------------------------------------------------ |
+| define | Executed when the decorator is defined for a function  |
+| before | Executed before the function                           |
+| after  | Executed after the function                            |
+| error  | Executed if the function throws an error               |
 
 ---
 
@@ -445,10 +454,16 @@ Available methods
 Current modules
 
 ```
-files
-json
-random
-http
+archive   bars      clipboard
+colors    console   crypto
+database  date      files
+gtk       html      http
+image     json      math
+matrix    os        process
+random    re        socket
+sys       table     text
+thread    time      tk
+yaml
 ```
 
 Example
@@ -473,9 +488,94 @@ Modules are loaded from
 
 ```
 module.wiz
+wiz_modules/module.wiz
+wiz_modules/module/module.wiz
 ```
 
 inside the current project.
+
+---
+
+# Package Manager
+
+Wiz can install packages directly from GitHub.
+
+Install all dependencies from `wiz.pkg`:
+
+```bash
+python wiz/main.py install
+```
+
+Install a single package (optionally pinned to a tag):
+
+```bash
+python wiz/main.py install aydin-here/mylib
+python wiz/main.py install aydin-here/mylib@v1.0.0
+```
+
+Remove, update and list packages:
+
+```bash
+python wiz/main.py uninstall mylib
+python wiz/main.py update
+python wiz/main.py update mylib
+python wiz/main.py list
+```
+
+`wiz update` re-fetches every installed package from its latest
+(default) branch, dropping any `@tag` pin. `wiz update mylib` updates a
+single installed package by name.
+
+Installed packages are extracted into `wiz_modules/` and imported like
+any other module. Each package can declare a `wiz.pkg` manifest with a
+`name`, `version`, and `dependencies`, which are installed recursively.
+
+```wiz
+import mylib
+
+mylib.greet("Wiz")
+```
+
+---
+
+# Linter
+
+Wiz ships with a static linter that analyzes a file without running it.
+
+```bash
+python wiz/main.py lint hello.wiz
+```
+
+If no problems are found:
+
+```text
+  examples/hello.wiz: no issues found
+```
+
+Reported problems look like:
+
+```text
+  examples/bad.wiz:13:1  W005  Cannot assign to immutable variable 'count'
+  examples/bad.wiz:15:1  W008  'break' used outside of a loop
+```
+
+### Checks
+
+| Code  | Severity | Description                                    |
+| ----- | -------- | ---------------------------------------------- |
+| E001  | error    | Syntax or lexical error                        |
+| S001  | style    | Trailing whitespace                            |
+| S002  | style    | Missing newline at end of file                 |
+| W001  | warning  | Duplicate function in the same scope           |
+| W002  | warning  | Variable already declared in the same scope    |
+| W003  | warning  | Function defined but never used                |
+| W004  | warning  | Variable declared but never used               |
+| W005  | warning  | Assignment to an immutable (`let`) variable    |
+| W008  | warning  | `break` / `continue` outside a loop            |
+| W009  | warning  | `return` outside a function                    |
+| W010  | warning  | Unreachable code after return / break / continue |
+| W011  | warning  | Call to an undefined function                  |
+| W012  | warning  | Use of an undefined decorator                  |
 
 ---
 
@@ -521,6 +621,21 @@ Version
 
 ```bash
 python wiz/main.py version
+```
+
+Packages
+
+```bash
+python wiz/main.py install aydin-here/mylib
+python wiz/main.py update
+python wiz/main.py uninstall mylib
+python wiz/main.py list
+```
+
+Lint
+
+```bash
+python wiz/main.py lint hello.wiz
 ```
 
 Help
@@ -569,8 +684,10 @@ wiz/
 ├── errors.py
 ├── interpreter.py
 ├── lexer.py
+├── linter.py
 ├── main.py
 ├── nodes.py
+├── package_manager.py
 ├── parser.py
 ├── runtime.py
 ├── stdlib
@@ -617,7 +734,6 @@ Upcoming features
 * REPL
 * Debugger
 * Formatter
-* Package Manager
 * Package Registry
 * Language Server Protocol (LSP)
 

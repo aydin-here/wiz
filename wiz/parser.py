@@ -1,4 +1,4 @@
-from tokens import TokenType
+from tokens import TokenType, token_name, describe_token
 from nodes import *
 from errors import WizSyntaxError
 from lexer import Lexer
@@ -27,7 +27,7 @@ class Parser:
 
         if token.type != token_type:
             raise WizSyntaxError(
-                f"Expected {token_type}, got {token.type}",
+                f"Expected {token_name(token_type)}, found {describe_token(token)}",
                 token.line,
                 token.column
             )
@@ -76,7 +76,7 @@ class Parser:
             return expression
 
         raise WizSyntaxError(
-            f"Invalid expression.",
+            f"Invalid expression starting with {describe_token(token)}",
             token.line,
             token.column
         )
@@ -95,8 +95,8 @@ class Parser:
             value = self.parse_expression()
 
             return Argument(
-                line=self.current().line,
-                column=self.current().column,
+                line=value.line,
+                column=value.column,
                 name=name,
                 value=value
             )
@@ -105,8 +105,8 @@ class Parser:
         value = self.parse_expression()
 
         return Argument(
-            line=self.current().line,
-            column=self.current().column,
+            line=value.line,
+            column=value.column,
             name=None,
             value=value
         )
@@ -145,21 +145,23 @@ class Parser:
                 self.skip_newlines()
                 self.match(TokenType.RPAREN)
 
-                if isinstance(expression, Identifier):
+                base = expression
+
+                if isinstance(base, Identifier):
 
                     expression = CallExpression(
-                        line=self.current().line,
-                        column=self.current().column,
-                        name=expression.name,
+                        line=base.line,
+                        column=base.column,
+                        name=base.name,
                         arguments=arguments
                     )
 
                 else:
 
                     expression = FunctionCallExpression(
-                        line=self.current().line,
-                        column=self.current().column,
-                        function=expression,
+                        line=base.line,
+                        column=base.column,
+                        function=base,
                         arguments=arguments
                     )
 
@@ -173,8 +175,8 @@ class Parser:
                 self.match(TokenType.RBRACKET)
 
                 expression = IndexExpression(
-                    line=self.current().line,
-                    column=self.current().column,
+                    line=expression.line,
+                    column=expression.column,
                     object=expression,
                     index=index
                 )
@@ -184,7 +186,9 @@ class Parser:
 
                 self.advance()
 
-                name = self.match(TokenType.IDENTIFIER).value
+                name_token = self.match(TokenType.IDENTIFIER)
+
+                name = name_token.value
 
 
                 if self.current().type == TokenType.LPAREN:
@@ -217,8 +221,8 @@ class Parser:
                     if isinstance(expression, MemberExpression):
 
                         expression = MemberCallExpression(
-                            line=self.current().line,
-                            column=self.current().column,
+                            line=name_token.line,
+                            column=name_token.column,
                             object=expression,
                             function=name,
                             arguments=arguments
@@ -227,8 +231,8 @@ class Parser:
                     else:
 
                         expression = MethodCallExpression(
-                            line=self.current().line,
-                            column=self.current().column,
+                            line=name_token.line,
+                            column=name_token.column,
                             object=expression,
                             method=name,
                             arguments=arguments
@@ -239,8 +243,8 @@ class Parser:
 
 
                 expression = MemberExpression(
-                    line=self.current().line,
-                    column=self.current().column,
+                    line=name_token.line,
+                    column=name_token.column,
                     object=expression,
                     property=name
                 )
@@ -267,8 +271,8 @@ class Parser:
             right = self.parse_unary()
 
             left = BinaryExpression(
-                line=self.current().line,
-                column=self.current().column,
+                line=operator.line,
+                column=operator.column,
                 left=left,
                 operator=operator.type,
                 right=right
@@ -291,8 +295,8 @@ class Parser:
             right = self.parse_term()
 
             left = BinaryExpression(
-                line=self.current().line,
-                column=self.current().column,
+                line=operator.line,
+                column=operator.column,
                 left=left,
                 operator=operator.type,
                 right=right
@@ -316,16 +320,16 @@ class Parser:
             TokenType.NOT_EQUAL,
         ):
 
-            operator = self.current().type
+            operator = self.current()
             self.advance()
 
             right = self.parse_addition()
 
             left = ComparisonExpression(
-                line=self.current().line,
-                column=self.current().column,
+                line=operator.line,
+                column=operator.column,
                 left=left,
-                operator=operator,
+                operator=operator.type,
                 right=right
             )
 
@@ -339,13 +343,13 @@ class Parser:
             TokenType.PLUS,
         ):
 
-            operator = self.current().type
+            operator = self.current()
             self.advance()
 
             return UnaryExpression(
-                line=self.current().line,
-                column=self.current().column,
-                operator=operator,
+                line=operator.line,
+                column=operator.column,
+                operator=operator.type,
                 operand=self.parse_unary()
             )
 
@@ -357,16 +361,16 @@ class Parser:
 
         while self.current().type == TokenType.AND:
 
-            operator = self.current().type
+            operator = self.current()
             self.advance()
 
             right = self.parse_comparison()
 
             left = LogicalExpression(
-                line=self.current().line,
-                column=self.current().column,
+                line=operator.line,
+                column=operator.column,
                 left=left,
-                operator=operator,
+                operator=operator.type,
                 right=right
             )
 
@@ -378,16 +382,16 @@ class Parser:
 
         while self.current().type == TokenType.OR:
 
-            operator = self.current().type
+            operator = self.current()
             self.advance()
 
             right = self.parse_and()
 
             left = LogicalExpression(
-                line=self.current().line,
-                column=self.current().column,
+                line=operator.line,
+                column=operator.column,
                 left=left,
-                operator=operator,
+                operator=operator.type,
                 right=right
             )
 
@@ -404,8 +408,8 @@ class Parser:
         value = self.parse_expression()
 
         return LetStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=name.line,
+            column=name.column,
             name=name.value,
             value=value
         )
@@ -421,8 +425,8 @@ class Parser:
         value = self.parse_expression()
 
         return VarStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=name.line,
+            column=name.column,
             name=name.value,
             value=value
         )
@@ -444,9 +448,13 @@ class Parser:
             value = self.parse_expression()
 
             return IndexAssignmentStatement(
-                line=self.current().line,
-                column=self.current().column,
-                object=Identifier(name.value),
+                line=name.line,
+                column=name.column,
+                object=Identifier(
+                    line=name.line,
+                    column=name.column,
+                    name=name.value
+                ),
                 index=index,
                 value=value
             )
@@ -456,8 +464,8 @@ class Parser:
         value = self.parse_expression()
 
         return AssignmentStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=name.line,
+            column=name.column,
             name=name.value,
             value=value
         )
@@ -485,7 +493,7 @@ class Parser:
 
     def parse_when(self):
 
-        self.match(TokenType.WHEN)
+        when = self.match(TokenType.WHEN)
 
         condition = self.parse_expression()
 
@@ -501,11 +509,13 @@ class Parser:
 
             self.advance()
 
+            self.skip_newlines()
+
             else_body = self.parse_block()
 
         return WhenStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=when.line,
+            column=when.column,
             condition=condition,
             body=body,
             else_body=else_body
@@ -513,7 +523,7 @@ class Parser:
 
     def parse_switch(self):
 
-        self.match(TokenType.SWITCH)
+        switch = self.match(TokenType.SWITCH)
 
         expression = self.parse_expression()
 
@@ -574,8 +584,8 @@ class Parser:
         self.match(TokenType.RBRACE)
 
         return SwitchStatement(
-            line=expression.line,
-            column=expression.column,
+            line=switch.line,
+            column=switch.column,
             expression=expression,
             cases=cases,
             default=default
@@ -583,22 +593,24 @@ class Parser:
 
     def parse_while(self):
 
-        self.match(TokenType.WHILE)
+        while_token = self.match(TokenType.WHILE)
 
         condition = self.parse_expression()
+
+        self.skip_newlines()
 
         body = self.parse_block()
 
         return WhileStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=while_token.line,
+            column=while_token.column,
             condition=condition,
             body=body
         )
 
     def parse_for(self):
 
-        self.match(TokenType.FOR)
+        for_token = self.match(TokenType.FOR)
 
         variable = self.match(TokenType.IDENTIFIER).value
 
@@ -624,8 +636,8 @@ class Parser:
             body = self.parse_block()
 
             return ForStatement(
-                line=self.current().line,
-                column=self.current().column,
+                line=for_token.line,
+                column=for_token.column,
                 variable=variable,
                 iterable=None,
                 start=start,
@@ -640,8 +652,8 @@ class Parser:
         body = self.parse_block()
 
         return ForStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=for_token.line,
+            column=for_token.column,
             variable=variable,
             iterable=start,
             start=None,
@@ -661,8 +673,8 @@ class Parser:
         body = self.parse_block()
 
         return ClassStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=name.line,
+            column=name.column,
             name=name.value,
             body=body
         )
@@ -705,8 +717,8 @@ class Parser:
         body = self.parse_block()
 
         return FunctionStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=name.line,
+            column=name.column,
             name=name.value,
             params=params,
             defaults=defaults,
@@ -744,13 +756,13 @@ class Parser:
 
     def parse_return(self):
 
-        self.match(TokenType.RETURN)
+        return_token = self.match(TokenType.RETURN)
 
         value = self.parse_expression()
 
         return ReturnStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=return_token.line,
+            column=return_token.column,
             value=value
         )
 
@@ -779,17 +791,17 @@ class Parser:
 
     def parse_break(self):
 
-        self.match(TokenType.BREAK)
+        token = self.match(TokenType.BREAK)
 
-        return BreakStatement(line=self.current().line,
-                        column=self.current().column)
+        return BreakStatement(line=token.line,
+                        column=token.column)
 
     def parse_continue(self):
 
-        self.match(TokenType.CONTINUE)
+        token = self.match(TokenType.CONTINUE)
 
-        return ContinueStatement(line=self.current().line,
-                        column=self.current().column)
+        return ContinueStatement(line=token.line,
+                        column=token.column)
 
     def parse_import(self):
 
@@ -798,13 +810,13 @@ class Parser:
         module = self.match(TokenType.IDENTIFIER)
 
         return ImportStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=module.line,
+            column=module.column,
             module=module.value)
 
     def parse_list(self):
 
-        self.match(TokenType.LBRACKET)
+        lbracket = self.match(TokenType.LBRACKET)
         self.skip_newlines()
 
         elements = []
@@ -829,8 +841,8 @@ class Parser:
         self.match(TokenType.RBRACKET)
 
         return ListLiteral(
-            line=self.current().line,
-            column=self.current().column,
+            line=lbracket.line,
+            column=lbracket.column,
             elements=elements
         )
 
@@ -911,7 +923,9 @@ class Parser:
 
         self.match(TokenType.HASH)
 
-        name = self.match(TokenType.IDENTIFIER).value
+        name_token = self.match(TokenType.IDENTIFIER)
+
+        name = name_token.value
 
         arguments = []
 
@@ -933,8 +947,8 @@ class Parser:
             self.match(TokenType.RPAREN)
 
         return Decorator(
-            line=self.current().line,
-            column=self.current().column,
+            line=name_token.line,
+            column=name_token.column,
             name=name,
             arguments=arguments
         )
@@ -943,7 +957,9 @@ class Parser:
 
         self.match(TokenType.DECORATOR)
 
-        name = self.match(TokenType.IDENTIFIER).value
+        name_token = self.match(TokenType.IDENTIFIER)
+
+        name = name_token.value
 
         self.match(TokenType.LPAREN)
 
@@ -971,6 +987,7 @@ class Parser:
 
         self.match(TokenType.LBRACE)
 
+        define = None
         before = None
         after = None
         error = None
@@ -982,7 +999,9 @@ class Parser:
             if self.current().type == TokenType.RBRACE:
                 break
 
-            hook = self.match(TokenType.IDENTIFIER).value
+            hook_token = self.match(TokenType.IDENTIFIER)
+
+            hook = hook_token.value
 
             self.match(TokenType.LPAREN)
 
@@ -1000,7 +1019,10 @@ class Parser:
 
             block = self.parse_block()
 
-            if hook == "before":
+            if hook == "define":
+                define = block
+
+            elif hook == "before":
                 before = block
 
             elif hook == "after":
@@ -1012,8 +1034,8 @@ class Parser:
             else:
                 raise WizSyntaxError(
                     f"Unknown decorator hook '{hook}'",
-                    self.current().line,
-                    self.current().column
+                    hook_token.line,
+                    hook_token.column
                 )
 
             self.skip_newlines()
@@ -1021,11 +1043,12 @@ class Parser:
         self.match(TokenType.RBRACE)
 
         return DecoratorStatement(
-            line=self.current().line,
-            column=self.current().column,
+            line=name_token.line,
+            column=name_token.column,
             name=name,
             params=params,
             defaults=defaults,
+            define=define,
             before=before,
             after=after,
             error=error
@@ -1033,7 +1056,7 @@ class Parser:
 
     def parse_dict(self):
 
-        self.match(TokenType.LBRACE)
+        lbrace = self.match(TokenType.LBRACE)
         self.skip_newlines()
 
         pairs = []
@@ -1062,8 +1085,8 @@ class Parser:
         self.match(TokenType.RBRACE)
 
         return DictLiteral(
-            line=self.current().line,
-            column=self.current().column,
+            line=lbrace.line,
+            column=lbrace.column,
             pairs=pairs)
 
     def parse_statement(self):
@@ -1135,7 +1158,7 @@ class Parser:
             return None
 
         raise WizSyntaxError(
-            f"Unexpected token {self.current().type}",
+            f"Unexpected {describe_token(self.current())}",
             self.current().line,
             self.current().column
         )

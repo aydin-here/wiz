@@ -6,6 +6,7 @@ from parser import Parser
 from runtime import Module, WizClass, WizInstance
 from stdlib import STDLIB
 from decorators import *
+from package_manager import MODULES_DIR
 import os
 
 
@@ -22,8 +23,16 @@ class ContinueException(Exception):
     pass
 
 class WizFunction:
-    def __init__(self, statement):
+    def __init__(self, statement, interpreter=None):
         self.statement = statement
+        self.interpreter = interpreter
+
+    def __call__(self, *args, **kwargs):
+        if self.interpreter is None:
+            raise RuntimeError(
+                "This Wiz function has no attached interpreter"
+            )
+        return self.interpreter.call_wiz_function(self, args, kwargs)
 
 class Interpreter:
 
@@ -307,7 +316,7 @@ class Interpreter:
 
         node.closure = self.scopes.copy()
 
-        self.functions[node.name] = WizFunction(node)
+        self.functions[node.name] = WizFunction(node, self)
 
     def visit_ClassStatement(self, node):
 
@@ -371,12 +380,35 @@ class Interpreter:
             node.column
         )
 
+    def _find_module(self, module):
+
+        candidates = [
+            os.path.join(self.base_path, module + ".wiz"),
+            os.path.join(self.base_path, MODULES_DIR, module + ".wiz"),
+            os.path.join(
+                self.base_path, MODULES_DIR, module, module + ".wiz"
+            )
+        ]
+
+        for candidate in candidates:
+
+            if os.path.isfile(candidate):
+                return candidate
+
+        return None
+
     def visit_ImportStatement(self, node):
 
         if node.module in self.stdlib:
 
             if node.module not in self.modules:
-                self.modules[node.module] = self.stdlib[node.module]()
+
+                instance = self.stdlib[node.module]()
+
+                if hasattr(instance, "interpreter"):
+                    instance.interpreter = self
+
+                self.modules[node.module] = instance
 
             self.scopes[0][node.module] = {
                 "value": self.modules[node.module],
@@ -384,12 +416,17 @@ class Interpreter:
             }
 
             return
-        
-        filename = os.path.join(
-            self.base_path,
-            node.module + ".wiz"
-        )
 
+        filename = self._find_module(node.module)
+
+        if filename is None:
+            raise WizNameError(
+                f"Module '{node.module}' not found. "
+                "Make sure the file exists or install it with "
+                "'wiz install <owner/repo>'.",
+                node.line,
+                node.column
+            )
 
         with open(filename) as file:
             source = file.read()
@@ -815,19 +852,29 @@ class Interpreter:
                     node.column
                 )
 
-            arguments = [
-                self.visit(arg)
-                for arg in node.arguments
-            ]
+            args = []
+            kwargs = {}
+
+            for argument in node.arguments:
+
+                value = self.visit(argument.value)
+
+                if argument.name is None:
+                    args.append(value)
+                else:
+                    kwargs[argument.name] = value
 
             if callable(func):
-                return func(*arguments)
+                return func(*args, **kwargs)
+
+            if isinstance(func, WizFunction):
+                func = func.statement
 
             scope = {}
 
             for param, value in zip(
                 func.params,
-                arguments
+                args
             ):
                 scope[param] = {
                     "value": value,
@@ -873,10 +920,17 @@ class Interpreter:
 
         obj = self.visit(node.object)
 
-        arguments = [
-            self.visit(arg)
-            for arg in node.arguments
-        ]
+        args = []
+        kwargs = {}
+
+        for argument in node.arguments:
+
+            value = self.visit(argument.value)
+
+            if argument.name is None:
+                args.append(value)
+            else:
+                kwargs[argument.name] = value
 
 
         # Module functions
@@ -891,14 +945,22 @@ class Interpreter:
                     node.column
                 )
 
+            if isinstance(func, WizFunction):
+                func = func.statement
 
             scope = {}
 
             for param, value in zip(
                 func.params,
-                arguments
+                args
             ):
                 scope[param] = {
+                    "value": value,
+                    "mutable": True
+                }
+
+            for name, value in kwargs.items():
+                scope[name] = {
                     "value": value,
                     "mutable": True
                 }
@@ -934,9 +996,15 @@ class Interpreter:
 
             for param, value in zip(
                 method.params,
-                arguments
+                args
             ):
                 scope[param] = {
+                    "value": value,
+                    "mutable": True
+                }
+
+            for name, value in kwargs.items():
+                scope[name] = {
                     "value": value,
                     "mutable": True
                 }
@@ -1113,6 +1181,12 @@ class Interpreter:
             "arguments": decorator.arguments
         })
 
+        function._decorator = decorator
+
+        runtime.define(
+            DecoratorContext(self, function)
+        )
+
     def decorator_call(self, ctx, *args):
 
         function = ctx.function
@@ -1226,3 +1300,112 @@ class Interpreter:
                 )
 
         return scope
+
+    def call_wiz_function(self, wiz_function, args=None, kwargs=None):
+
+        from errors import WizRuntimeError
+
+        function = wiz_function.statement
+
+        args = list(args or [])
+        kwargs = dict(kwargs or {})
+
+        scope = {}
+
+        used = set()
+        positional_index = 0
+
+        for value in args:
+
+            while (
+                positional_index < len(function.params)
+                and function.params[positional_index] in used
+            ):
+                positional_index += 1
+
+            if positional_index >= len(function.params):
+                raise WizRuntimeError(
+                    f"Too many arguments for function '{function.name}'"
+                )
+
+            param = function.params[positional_index]
+
+            scope[param] = {"value": value, "mutable": True}
+
+            used.add(param)
+            positional_index += 1
+
+        for name, value in kwargs.items():
+
+            if name not in function.params:
+                raise WizRuntimeError(
+                    f"Unknown parameter '{name}'"
+                )
+
+            if name in used:
+                raise WizRuntimeError(
+                    f"Parameter '{name}' already assigned"
+                )
+
+            scope[name] = {"value": value, "mutable": True}
+
+            used.add(name)
+
+        for param in function.params:
+
+            if param in scope:
+                continue
+
+            if param in function.defaults:
+
+                scope[param] = {
+                    "value": self.visit(function.defaults[param]),
+                    "mutable": True
+                }
+
+            else:
+
+                raise WizRuntimeError(
+                    f"Missing required parameter '{param}'"
+                )
+
+        decorator_states = []
+
+        for decorator in function.decorators:
+
+            function._decorator = decorator
+
+            runtime = self.decorators.get(decorator.name)
+
+            if runtime:
+
+                ctx = DecoratorContext(self, function)
+
+                state = DecoratorState()
+
+                runtime.before(ctx, state)
+
+                decorator_states.append((runtime, ctx, state))
+
+        try:
+
+            result = self.visit_Block(function.body, scope)
+
+        except ReturnException as e:
+
+            result = e.value
+
+        except Exception:
+
+            for runtime, ctx, state in decorator_states:
+                runtime.error(ctx)
+
+            raise
+
+        for runtime, ctx, state in decorator_states:
+
+            ctx.result = result
+
+            runtime.after(ctx, state)
+
+        return result

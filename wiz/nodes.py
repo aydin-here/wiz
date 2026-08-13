@@ -174,6 +174,7 @@ class DecoratorStatement(Node):
     name: str
     params: list[str]
     defaults: dict[str, Node]
+    define: Block | None = None
     before: Block | None = None
     after: Block | None = None
     error: Block | None = None

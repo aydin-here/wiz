@@ -3,6 +3,9 @@ from errors import *
 
 class DecoratorRuntime:
 
+    def define(self, ctx):
+        pass
+
     def before(self, ctx, state):
         pass
 
@@ -125,6 +128,16 @@ class UserDecorator(DecoratorRuntime):
                 )
 
         return scope
+
+    def define(self, ctx):
+
+        if self.statement.define is None:
+            return
+
+        ctx.interpreter.visit_Block(
+            self.statement.define,
+            self.build_scope(ctx, None)
+        )
 
     def before(self, ctx, state):
 

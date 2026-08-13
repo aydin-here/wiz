@@ -14,6 +14,7 @@ User decorators:
     decorator my_decorator(...) { ... }
 
 Available hooks:
+    define(ctx)
     before(ctx)
     after(ctx, state)
     error(ctx)
@@ -24,7 +25,7 @@ Objects:
         .function.params
         .result
         .call()
-        
+
     state
         Stores values shared between hooks.
 
@@ -64,6 +65,11 @@ slow_function()
 // -------------------------------------------------
 
 decorator on_command(command) {
+
+    define(ctx) {
+
+        echo($"DEFINE  : '{ctx.function.name}' registered for command '{command}'")
+    }
 
     before(ctx) {
 
