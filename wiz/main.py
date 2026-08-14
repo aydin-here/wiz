@@ -18,7 +18,8 @@ from package_manager import (
     update_package,
     update_all,
     uninstall_package,
-    list_packages
+    list_packages,
+    info_package
 )
 from linter import Linter
 from formatter import Formatter
@@ -78,6 +79,7 @@ Commands:
     -U, upgrade                   Update Wiz itself from GitHub
     uninstall <package>           Remove an installed package
     list                          List installed packages
+    info <package>                Show package manifest details
     version                       Show language version
     help                          Show this help
 """)
@@ -523,6 +525,17 @@ def main():
     if command == "list":
         try:
             list_packages()
+        except WizError as error:
+            print(f"Error: {error.message}")
+            sys.exit(1)
+        return
+
+    if command == "info":
+        if len(sys.argv) != 3:
+            print("Usage: wiz info <package>")
+            return
+        try:
+            info_package(sys.argv[2])
         except WizError as error:
             print(f"Error: {error.message}")
             sys.exit(1)

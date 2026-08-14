@@ -6,8 +6,7 @@ from parser import Parser
 from runtime import Module, WizClass, WizInstance, Super
 from stdlib import STDLIB
 from decorators import *
-from package_manager import MODULES_DIR
-import os
+from package_loader import PackageLoader, PackageResolution
 
 
 def to_display(value, nested=False):
@@ -39,6 +38,13 @@ class BreakException(Exception):
 class ContinueException(Exception):
     pass
 
+
+#: Hidden key stored in every module scope so imports resolve relative
+#: to the module's own directory (needed for multi-file Wiz packages).
+#: The NUL character cannot appear in a Wiz source file, so this can
+#: never collide with a real variable name.
+_MODULE_DIR_KEY = "\0wiz_module_dir"
+
 class WizFunction:
     def __init__(self, statement, interpreter=None):
         self.statement = statement
@@ -62,6 +68,7 @@ class Interpreter:
         self.stdlib = STDLIB
         self.modules = {}
         self.base_path = base_path
+        self.package_loader = PackageLoader(base_path)
         self.builtins = {
             "str": to_display,
             "num": int,
@@ -492,23 +499,33 @@ class Interpreter:
 
     def _find_module(self, module):
 
-        candidates = [
-            os.path.join(self.base_path, module + ".wiz"),
-            os.path.join(self.base_path, MODULES_DIR, module + ".wiz"),
-            os.path.join(
-                self.base_path, MODULES_DIR, module, module + ".wiz"
-            )
-        ]
+        resolution = self.package_loader.find(module)
 
-        for candidate in candidates:
+        if resolution is None:
+            return None
 
-            if os.path.isfile(candidate):
-                return candidate
+        return resolution.entry
+
+    def _current_module_dir(self):
+        """Directory of the module whose body is currently executing.
+
+        Scans the active scope stack for the hidden module-dir marker
+        that every module scope carries. Because function closures keep
+        their module scope, this also works for imports issued from
+        module functions. Returns None when running project code.
+        """
+
+        for scope in reversed(self.scopes):
+
+            if _MODULE_DIR_KEY in scope:
+                return scope[_MODULE_DIR_KEY]["value"]
 
         return None
 
     def visit_ImportStatement(self, node):
 
+        # ---------------- Built-in stdlib modules ----------------
+        # stdlib modules cannot be shadowed by external packages.
         if node.module in self.stdlib:
 
             if node.module not in self.modules:
@@ -527,16 +544,58 @@ class Interpreter:
 
             return
 
-        filename = self._find_module(node.module)
+        # ---------------- External packages ----------------
+        # Imports inside a module resolve relative to that module's own
+        # directory first, so multi-file Wiz packages can import their
+        # sibling files (e.g. main.wiz importing util.wiz).
+        resolution = None
 
-        if filename is None:
-            raise WizNameError(
+        module_dir = self._current_module_dir()
+
+        if module_dir is not None:
+
+            sibling = os.path.join(module_dir, node.module + ".wiz")
+
+            if os.path.isfile(sibling):
+                resolution = PackageResolution(
+                    node.module,
+                    "wiz",
+                    entry=sibling
+                )
+
+        if resolution is None:
+            resolution = self.package_loader.find(node.module)
+
+        if resolution is None:
+            raise PackageNotFoundError(
                 f"Module '{node.module}' not found. "
                 "Make sure the file exists or install it with "
                 "'wiz install <owner/repo>'.",
                 node.line,
                 node.column
             )
+
+        # ---------------- Python packages ----------------
+        if resolution.kind == "python":
+
+            if node.module not in self.modules:
+
+                instance = self.package_loader.load_python(
+                    resolution,
+                    self
+                )
+
+                self.modules[node.module] = instance
+
+            self.scopes[0][node.module] = {
+                "value": self.modules[node.module],
+                "mutable": False
+            }
+
+            return
+
+        # ---------------- Wiz modules and packages ----------------
+        filename = resolution.entry
 
         with open(filename) as file:
             source = file.read()
@@ -550,6 +609,14 @@ class Interpreter:
 
 
         module_scope = {}
+
+        # Hidden marker so imports inside this module (and inside its
+        # functions, which capture this scope in their closure) resolve
+        # relative to the module's own directory.
+        module_scope[_MODULE_DIR_KEY] = {
+            "value": os.path.dirname(filename),
+            "mutable": False
+        }
 
         old_scope = self.scopes
         old_functions = self.functions
@@ -778,6 +845,10 @@ class Interpreter:
                                 node.column
                             )
 
+                old_scopes = self.scopes
+
+                self.scopes = function.closure + [scope]
+
                 try:
                     return self.visit_Block(
                         function.body,
@@ -786,6 +857,26 @@ class Interpreter:
 
                 except ReturnException as e:
                     return e.value
+
+                finally:
+                    self.scopes = old_scopes
+
+            # A stored callable, e.g. a native package function.
+            if callable(func):
+
+                args = []
+                kwargs = {}
+
+                for argument in node.arguments:
+
+                    value = self.visit(argument.value)
+
+                    if argument.name is None:
+                        args.append(value)
+                    else:
+                        kwargs[argument.name] = value
+
+                return func(*args, **kwargs)
 
         # ---------------- Classes ----------------
 
@@ -1602,7 +1693,7 @@ class Interpreter:
 
         decorator_states = []
 
-        for decorator in function.decorators:
+        for decorator in getattr(function, "decorators", []):
 
             function._decorator = decorator
 
@@ -1618,6 +1709,10 @@ class Interpreter:
 
                 decorator_states.append((runtime, ctx, state))
 
+        old_scopes = self.scopes
+
+        self.scopes = function.closure + [scope]
+
         try:
 
             result = self.visit_Block(function.body, scope)
@@ -1632,6 +1727,10 @@ class Interpreter:
                 runtime.error(ctx)
 
             raise
+
+        finally:
+
+            self.scopes = old_scopes
 
         for runtime, ctx, state in decorator_states:
 

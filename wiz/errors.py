@@ -88,7 +88,10 @@ def render_error(error):
 
     parts = [_banner(label)]
 
-    location = f"Line {error.line}, Column {error.column}"
+    if error.line is None:
+        location = "unknown"
+    else:
+        location = f"Line {error.line}, Column {error.column}"
 
     if getattr(error, "filename", None):
         location = f"{error.filename}:{error.line}:{error.column}"
@@ -178,3 +181,31 @@ class WizThrowError(WizError):
     def __init__(self, message, line=None, column=None, value=None):
         super().__init__(message, line, column)
         self.value = value
+
+
+class PackageError(WizError):
+    label = "Package Error"
+
+    def __init__(self, message, line=None, column=None, path=None):
+        super().__init__(message, line, column)
+        self.path = path
+
+
+class PackageNotFoundError(PackageError):
+    label = "Package Not Found"
+
+
+class InvalidPackageManifestError(PackageError):
+    label = "Invalid Package Manifest"
+
+
+class UnsupportedPackageTypeError(PackageError):
+    label = "Unsupported Package Type"
+
+
+class PythonPackageLoadError(PackageError):
+    label = "Python Package Load Error"
+
+
+class PythonDependencyError(PackageError):
+    label = "Python Dependency Error"

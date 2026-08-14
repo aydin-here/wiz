@@ -37,6 +37,7 @@ install [owner/repo[@tag]]    Install all dependencies or a package
 update [package]              Update all packages or a specific one
 uninstall <package>           Remove an installed package
 list                          List installed packages
+info <package>                Show details about an installed package
 version                       Show current version
 help                          Show help
 ```
@@ -480,9 +481,64 @@ Modules are loaded only once during execution.
 
 ---
 
-# Package Manager
+# Packages
 
-Install all dependencies listed in `wiz.pkg`:
+Packages are shareable libraries that you install into a project. They
+land in a `wiz_modules/` directory next to your code and are imported
+like any other module:
+
+```wiz
+import hello_wiz
+
+hello_wiz.hello("Wiz")
+echo(hello_wiz.VERSION)
+```
+
+A package is either a **Wiz package** (implemented in Wiz) or a
+**native package** (implemented in Python). Both kinds look the same from
+Wiz code; only the manifest `type` and the entry file differ.
+
+---
+
+## The `wiz.pkg` manifest
+
+Every project *and* every package may carry a JSON manifest called
+`wiz.pkg`. A project manifest describes the project and its dependencies;
+a package manifest describes the package itself.
+
+Example project manifest:
+
+```json
+{
+    "name": "my-app",
+    "version": "1.0.0",
+    "dependencies": {
+        "hello_wiz": "owner/repo",
+        "hello_native": "./packages/hello_native"
+    }
+}
+```
+
+Fields:
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `name` | yes | Package name, used as the install directory under `wiz_modules/` |
+| `version` | yes | Semantic version, e.g. `"1.0.0"` |
+| `type` | no | `"wiz"` (default) or `"native"`; see [Package types](#package-types) |
+| `description` | no | Short human description |
+| `author` | no | Package author |
+| `license` | no | License identifier, e.g. `"MIT"` |
+| `repository` | no | Source URL |
+| `dependencies` | no | Map of package name to dependency spec (`owner/repo[@tag]` or a local path) |
+| `python_dependencies` | no | Python modules a native package needs (see [Native packages](#native-packages)) |
+| `wiz_version` | no | Minimum compatible interpreter version, e.g. `">=0.22.0"` |
+
+---
+
+## Installing packages
+
+Install every dependency listed in `wiz.pkg`:
 
 ```bash
 python3 wiz/main.py install
@@ -495,10 +551,32 @@ python3 wiz/main.py install owner/repo
 python3 wiz/main.py install owner/repo@v1.0.0
 ```
 
-Remove a package:
+Install a package from a local directory (offline):
 
 ```bash
-python3 wiz/main.py uninstall mylib
+python3 wiz/main.py install ./packages/hello_wiz
+```
+
+Packages are downloaded as GitHub tarballs, extracted into
+`wiz_modules/<name>/` and recorded in the project `wiz.pkg`. A package may
+declare its own dependencies, which are installed recursively into the
+same `wiz_modules/` directory. Reinstalling an already-installed package
+replaces it in place.
+
+---
+
+## Managing packages
+
+List installed packages with their version and type:
+
+```bash
+python3 wiz/main.py list
+```
+
+Show the manifest of an installed package:
+
+```bash
+python3 wiz/main.py info mylib
 ```
 
 Update all packages to their latest versions:
@@ -513,37 +591,294 @@ Update a single installed package by name:
 python3 wiz/main.py update mylib
 ```
 
+Remove a package:
+
+```bash
+python3 wiz/main.py uninstall mylib
+```
+
 Updating re-fetches each package from its latest (default) branch and
 removes any `@tag` pin from `wiz.pkg`.
 
-List installed packages:
+---
 
-```bash
-python3 wiz/main.py list
-```
+## Package types
 
-Packages are downloaded from GitHub and extracted into `wiz_modules/`.
-Each package may declare its own `wiz.pkg` manifest with a `name`,
-`version`, and `dependencies` field. Dependencies are installed
-recursively into the same `wiz_modules/` directory.
+Every package directory contains a `wiz.pkg` manifest. The `type` field
+decides which implementation the package uses and, therefore, which file
+is its entry point:
 
-Imported modules are resolved in this order:
+| `type` | Implementation | Entry file | Description |
+| ------ | -------------- | ---------- | ----------- |
+| `wiz` (default) | Wiz | `main.wiz` | A package written entirely in Wiz |
+| `native` | Python | `main.py` | A package written in Python (always native) |
+
+Rules:
+
+- If `type` is omitted, it **defaults to `wiz`** — the package is a Wiz
+  package.
+- `"native"` means the package is implemented in Python and exposes
+  callable functions to Wiz.
+- `"python"` is accepted as a legacy alias for `"native"` and is
+  normalized to `"native"` when the manifest is read.
+- Any other value is rejected with an `UnsupportedPackageTypeError`.
+
+---
+
+## How imports resolve
+
+When you `import <name>`, the interpreter looks in this order:
+
+1. **Stdlib modules** — built-in modules (`files`, `json`, `random`,
+   `http`, ...). They are resolved before anything else and can never be
+   shadowed by an installed package.
+2. **Inside a module**, a sibling file in that module's own directory
+   (`<module_dir>/<name>.wiz`). This is how a multi-file Wiz package
+   imports its own helper files.
+3. **Local project module** — `./<name>.wiz`.
+4. **Legacy flat module** — `wiz_modules/<name>.wiz`.
+5. **Installed package** — `wiz_modules/<name>/`, loaded through its
+   manifest: `main.wiz` for a Wiz package, `main.py` for a native one.
+   A legacy directory without a manifest uses
+   `wiz_modules/<name>/<name>.wiz`.
 
 ```text
-module.wiz
-wiz_modules/module.wiz
-wiz_modules/module/module.wiz
-```
-
-Packages are imported just like regular modules:
-
-```wiz
-import mylib
-
-mylib.greet("Wiz")
+stdlib
+<current module dir>/<name>.wiz   (inside a module)
+<name>.wiz
+wiz_modules/<name>.wiz
+wiz_modules/<name>/main.wiz       (or main.py for a native package)
 ```
 
 ---
+
+## Writing a Wiz package
+
+A Wiz package is a directory with a `wiz.pkg` manifest and a `main.wiz`
+entry file:
+
+```text
+hello_wiz/
+├── wiz.pkg
+└── main.wiz
+```
+
+`main.wiz`:
+
+```wiz
+func hello(name = "Wiz") {
+    return "Hello, " + name + "!"
+}
+
+let VERSION = "1.0.0"
+```
+
+`wiz.pkg`:
+
+```json
+{
+    "name": "hello_wiz",
+    "version": "1.0.0",
+    "description": "Example Wiz package"
+}
+```
+
+The whole package is imported under its name and its module-level
+functions, variables and classes are accessed through the module:
+
+```wiz
+import hello_wiz
+
+echo(hello_wiz.hello("Wiz"))      # -> Hello, Wiz!
+echo(hello_wiz.VERSION)           # -> 1.0.0
+```
+
+Notes:
+
+- `let VERSION` is **not required** — it is just a convention. Anything
+  declared at the top level of `main.wiz` becomes part of the module.
+- The entry file is always `main.wiz`. `import hello_wiz` maps the
+  package name to `wiz_modules/hello_wiz/main.wiz`.
+- You may keep a package's runtime state in module variables; the module
+  is loaded only once per execution, and module functions keep access to
+  their module scope no matter how they are called.
+
+### Multi-file packages
+
+A Wiz package may be split into several `.wiz` files. `main.wiz` is the
+public entry point; other files are implementation details and are
+imported *relative to the module*, not by package name:
+
+```text
+bundle/
+├── wiz.pkg
+├── main.wiz
+└── util.wiz
+```
+
+`util.wiz`:
+
+```wiz
+func double(n) {
+    return n * 2
+}
+```
+
+`main.wiz`:
+
+```wiz
+import util
+
+func quadruple(n) {
+    return util.double(util.double(n))
+}
+```
+
+Helper files are **private** to the package: a project can `import
+bundle` but cannot `import util` from outside the package.
+
+---
+
+## Writing a native package
+
+A native package is a directory with a `wiz.pkg` manifest of type
+`native` and a `main.py` entry file:
+
+```text
+hello_native/
+├── wiz.pkg
+└── main.py
+```
+
+`wiz.pkg`:
+
+```json
+{
+    "name": "hello_native",
+    "version": "1.0.0",
+    "type": "native",
+    "description": "Example Python package for Wiz"
+}
+```
+
+`main.py` **must** define a top-level variable named `module`. That
+object is what Wiz imports. It should expose at least a `functions`
+dictionary mapping Wiz function names to Python callables:
+
+```python
+class HelloNativeModule:
+
+    def __init__(self):
+        self.functions = {
+            "hello": self.hello,
+            "greet": self.greet,
+        }
+
+    def hello(self, name="Wiz"):
+        return f"Hello, {name}!"
+
+    def greet(self, name, excited=False):
+        return f"Hello, {name}!" + ("!!" if excited else "")
+
+
+module = HelloNativeModule()
+```
+
+If `main.py` does not define a `module` object, importing it fails.
+
+### What the module object may expose
+
+The `module` object is a plain Python object that Wiz reads attributes
+from:
+
+| Attribute | Purpose |
+| --------- | ------- |
+| `functions` | Dict of name -> callable. Exposed as callable module members. |
+| `values` | Dict of name -> value. Exposed as module variables. |
+| `classes` | Dict of name -> class. Exposed as module classes. |
+| `interpreter` | Set automatically by Wiz to the running interpreter, so a package can call back into Wiz. |
+
+At minimum `functions` is expected; `values` and `classes` are optional.
+
+### Calling conventions
+
+- Python functions receive Wiz arguments positionally and by keyword:
+  named Wiz arguments map to Python keyword arguments.
+- Missing arguments fall back to the Python default values; required
+  parameters that are not supplied raise an error.
+- Return values (strings, numbers, lists, dicts, Wiz instances, `None`,
+  and `WizFunction` wrappers) are passed back to Wiz unchanged.
+- A `WizFunction` can be stored by a package and invoked later, which is
+  how a native framework can register callbacks written in Wiz.
+
+### Python dependencies
+
+If a native package needs third-party Python modules, declare them in
+`python_dependencies`. Wiz checks that they are importable before loading
+the package and fails with a clear message otherwise:
+
+```json
+{
+    "name": "my_bot",
+    "version": "1.0.0",
+    "type": "native",
+    "python_dependencies": {
+        "requests": ">=2.0"
+    }
+}
+```
+
+(The version strings are informational; the actual check is only that
+the module can be imported. Install them with `pip`.)
+
+---
+
+## Dependencies between packages
+
+A package can depend on other packages. Dependencies may be GitHub specs
+or local relative paths. They are installed recursively, in the same
+`wiz_modules/` directory:
+
+```json
+{
+    "name": "calculator",
+    "version": "1.0.0",
+    "dependencies": {
+        "mathutil": "owner/mathutil",
+        "logger": "./packages/logger"
+    }
+}
+```
+
+Inside a package's code, its dependencies are imported by their own names:
+
+```wiz
+import mathutil
+
+func twice(n) {
+    return mathutil.times2(n)
+}
+```
+
+---
+
+## Version compatibility
+
+A package can require a minimum interpreter version. Wiz checks the
+constraint before running any package code and refuses to load it when
+incompatible:
+
+```json
+{
+    "name": "modern",
+    "version": "1.0.0",
+    "wiz_version": ">=0.22.0"
+}
+```
+
+Supported operators: `==`, `!=`, `>`, `<`, `>=`, `<=`, or a bare version
+number meaning "exactly this version".
+
 
 # Self-Update
 
@@ -1203,7 +1538,8 @@ examples/
 * Member access
 * Collection methods
 * Standard library (28 modules: `files`, `http`, `json`, `random`, `text`, `math`, `os`, `date`, `re`, `crypto`, `table`, `bars`, `colors`, `archive`, `yaml`, `image`, `matrix`, `process`, `socket`, `sys`, `thread`, `time`, `database`, `console`, `clipboard`, `gtk`, `tk`, `html`)
-* Package manager (install, update, uninstall, list)
+* Package manager (install, update, uninstall, list, info)
+* Wiz and native (Python) packages with multi-file support
 * Static linter
 * Comments (`//`)
 * AST printer

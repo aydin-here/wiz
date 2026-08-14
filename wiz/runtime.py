@@ -11,12 +11,12 @@ class Module:
 
     def get(self, name):
 
-        value = self.variables.get(name)
+        variable = self.variables.get(name)
 
-        if value is None:
-            return None
+        if variable is not None:
+            return variable["value"]
 
-        return value["value"]
+        return self.functions.get(name)
 
 
 class WizClass:
@@ -163,6 +163,51 @@ class Super:
 
     def __repr__(self):
         return f"[super of {self.klass.name}]"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class NativeModule:
+
+    """Runtime wrapper for a Python-backed external package.
+
+    The underlying Python package object follows the stdlib module
+    convention and exposes at least a ``functions`` dict. Optional
+    ``values`` and ``classes`` dicts are also supported so new package
+    features can be added without changing the package manager.
+    """
+
+    def __init__(self, name, module):
+        self.name = name
+        self.module = module
+        self.functions = getattr(module, "functions", None) or {}
+        self.values = getattr(module, "values", None) or {}
+        self.classes = getattr(module, "classes", None) or {}
+
+    def get(self, name):
+
+        if name in self.functions:
+            return self.functions[name]
+
+        if name in self.values:
+            return self.values[name]
+
+        if name in self.classes:
+            return self.classes[name]
+
+        return None
+
+    @property
+    def interpreter(self):
+        return getattr(self.module, "interpreter", None)
+
+    @interpreter.setter
+    def interpreter(self, value):
+        self.module.interpreter = value
+
+    def __repr__(self):
+        return f"[native module {self.name}]"
 
     def __str__(self):
         return self.__repr__()
