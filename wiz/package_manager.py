@@ -251,7 +251,10 @@ def _package_name_from_dir(directory, fallback):
 def _is_local_spec(spec):
     return (
         isinstance(spec, str)
-        and (spec.startswith(("./", "../", ".")) or os.sep in spec)
+        and (
+            spec.startswith(("./", "../", "."))
+            or spec.startswith(os.sep)
+        )
     )
 
 
