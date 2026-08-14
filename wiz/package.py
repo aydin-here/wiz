@@ -12,6 +12,10 @@ MANIFEST_FILE = "wiz.pkg"
 WIZ_ENTRY_FILE = "main.wiz"
 PYTHON_ENTRY_FILE = "main.py"
 
+#: Optional manifest field naming the package's entry file, relative to
+#: the package directory. Defaults to main.wiz / main.py by package type.
+ENTRY_FIELD = "entry"
+
 # A Wiz package is implemented in Wiz and its entry file is main.wiz.
 PACKAGE_TYPE_WIZ = "wiz"
 
@@ -45,6 +49,8 @@ WIZ_VERSION = "0.22.2"
 #:   version      (str, required)  semantic version, e.g. "1.0.0"
 #:   type         (str, optional)  "wiz" (default) or "native"
 #:       ("python" is also accepted and treated as "native")
+#:   entry        (str, optional)  entry file, relative to the package
+#:       directory. Defaults to "main.wiz" (wiz) or "main.py" (native).
 #:   description  (str, optional)  short human description
 #:   author       (str, optional)  package author
 #:   license      (str, optional)  license identifier, e.g. "MIT"
@@ -58,6 +64,7 @@ MANIFEST_SCHEMA = {
     "name": "(str, required) package name",
     "version": "(str, required) semantic version, e.g. '1.0.0'",
     "type": "'wiz' (default when omitted) or 'native' (alias: 'python')",
+    "entry": "(str, optional) entry file, default 'main.wiz' or 'main.py'",
     "description": "(str, optional) short human description",
     "author": "(str, optional) package author",
     "license": "(str, optional) license identifier, e.g. 'MIT'",
@@ -75,6 +82,30 @@ def manifest_path(base_path):
 def package_type(manifest):
     """Return the effective package type, defaulting to 'wiz'."""
     return manifest.get("type", DEFAULT_PACKAGE_TYPE)
+
+
+def default_entry_file(manifest):
+    """Conventional entry file for a package's type (main.wiz / main.py)."""
+
+    if is_python_package(package_type(manifest)):
+        return PYTHON_ENTRY_FILE
+
+    return WIZ_ENTRY_FILE
+
+
+def entry_file(manifest):
+    """Entry file for a package, honoring the optional 'entry' field.
+
+    Falls back to the type's conventional entry file when 'entry' is
+    omitted. The returned path is relative to the package directory.
+    """
+
+    entry = manifest.get(ENTRY_FIELD)
+
+    if entry:
+        return entry
+
+    return default_entry_file(manifest)
 
 
 def load_manifest(base_path):
@@ -160,6 +191,30 @@ def validate_manifest(manifest, path=None):
             f"Unsupported package type '{pkg_type}' for package '{name}'",
             path=path
         )
+
+    entry = manifest.get(ENTRY_FIELD)
+
+    if entry is not None:
+
+        if not isinstance(entry, str) or not entry.strip():
+            raise InvalidPackageManifestError(
+                f"Invalid package manifest '{path}': "
+                "'entry' must be a non-empty string",
+                path=path
+            )
+
+        entry = entry.strip().replace("\\", "/")
+
+        parts = entry.split("/")
+
+        if entry.startswith("/") or ".." in parts:
+            raise InvalidPackageManifestError(
+                f"Invalid package manifest '{path}': "
+                "'entry' must be a relative path inside the package",
+                path=path
+            )
+
+        manifest[ENTRY_FIELD] = entry
 
     return manifest
 

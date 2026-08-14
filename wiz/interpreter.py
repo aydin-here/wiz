@@ -620,6 +620,7 @@ class Interpreter:
 
         old_scope = self.scopes
         old_functions = self.functions
+        old_classes = self.classes
 
 
         self.scopes = [module_scope]
@@ -629,16 +630,26 @@ class Interpreter:
 
         self.visit(tree)
 
+        # Register the module's classes in its own scope so functions and
+        # methods defined in the module can reference them by name even
+        # after the interpreter's global class table has moved on.
+        for name, klass in self.classes.items():
+            module_scope[name] = {
+                "value": klass,
+                "mutable": False
+            }
 
         module = Module(
             node.module,
             module_scope,
-            self.functions
+            self.functions,
+            self.classes
         )
 
 
         self.scopes = old_scope
         self.functions = old_functions
+        self.classes = old_classes
 
 
         self.scopes[0][node.module] = {
@@ -812,6 +823,9 @@ class Interpreter:
         if variable is not None:
 
             func = variable["value"]
+
+            if isinstance(func, WizClass):
+                return func.instantiate(self, node)
 
             if isinstance(func, WizFunction):
 
@@ -1014,6 +1028,35 @@ class Interpreter:
                 node.column
             )
 
+    def instantiate_module_class(self, klass, node):
+        """Instantiate a class exposed by an imported module.
+
+        Wiz classes go through ``WizClass.instantiate``; classes exposed
+        by native packages are plain Python classes and are called with
+        the evaluated arguments instead.
+        """
+
+        if isinstance(klass, WizClass):
+            return klass.instantiate(self, node)
+
+        if callable(klass):
+
+            args = []
+            kwargs = {}
+
+            for argument in node.arguments:
+
+                value = self.visit(argument.value)
+
+                if argument.name is None:
+                    args.append(value)
+                else:
+                    kwargs[argument.name] = value
+
+            return klass(*args, **kwargs)
+
+        return None
+
     def visit_MethodCallExpression(self, node):
 
         obj = self.visit(node.object)
@@ -1126,6 +1169,30 @@ class Interpreter:
             func = obj.functions.get(node.method)
 
             if func is None:
+
+                klass = getattr(obj, "classes", {}).get(node.method)
+
+                if klass is not None:
+                    return self.instantiate_module_class(klass, node)
+
+                # Module variables may hold callables, e.g. a class
+                # re-exported from a sibling file of a multi-file package.
+                values = (
+                    getattr(obj, "variables", None)
+                    or getattr(obj, "values", {})
+                )
+
+                value = values.get(node.method)
+
+                if value is not None:
+                    result = self.instantiate_module_class(
+                        value["value"] if isinstance(value, dict) else value,
+                        node
+                    )
+
+                    if result is not None:
+                        return result
+
                 raise WizRuntimeError(
                     f"Module has no function '{node.method}'",
                     node.line,
@@ -1190,6 +1257,18 @@ class Interpreter:
 
                 return method(obj, *arguments)
 
+        # Native package instances: expose their Python methods.
+        method = getattr(type(obj), node.method, None)
+
+        if callable(method):
+
+            arguments = [
+                self.visit(arg)
+                for arg in node.arguments
+            ]
+
+            return method(obj, *arguments)
+
         raise WizTypeError(
             f"This type has no methods: {type(obj).__name__}",
             node.line,
@@ -1217,11 +1296,35 @@ class Interpreter:
 
 
         # Module functions
-        if isinstance(obj, Module):
+        if hasattr(obj, "functions"):
 
             func = obj.functions.get(node.function)
 
             if func is None:
+
+                klass = getattr(obj, "classes", {}).get(node.function)
+
+                if klass is not None:
+                    return self.instantiate_module_class(klass, node)
+
+                # Module variables may hold callables, e.g. a class
+                # re-exported from a sibling file of a multi-file package.
+                values = (
+                    getattr(obj, "variables", None)
+                    or getattr(obj, "values", {})
+                )
+
+                value = values.get(node.function)
+
+                if value is not None:
+                    result = self.instantiate_module_class(
+                        value["value"] if isinstance(value, dict) else value,
+                        node
+                    )
+
+                    if result is not None:
+                        return result
+
                 raise WizRuntimeError(
                     f"Module has no function '{node.function}'",
                     node.line,
@@ -1327,6 +1430,11 @@ class Interpreter:
                     *arguments
                 )
 
+        # Native package instances: expose their Python methods.
+        method = getattr(type(obj), node.function, None)
+
+        if callable(method):
+            return method(obj, *args, **kwargs)
 
         raise WizRuntimeError(
             f"'{node.function}' is not callable on {type(obj).__name__}",

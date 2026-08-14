@@ -12,6 +12,7 @@ from ui import Color, Spinner, download, paint
 from package import (
     load_manifest as load_package_manifest,
     package_type,
+    entry_file,
     validate_manifest,
     manifest_path as package_manifest_path,
     PYTHON_ENTRY_FILE,
@@ -254,13 +255,34 @@ def _is_local_spec(spec):
     )
 
 
+#: Entries never copied into the package store when installing.
+#: GitHub tarballs never contain .git anyway, but local directory
+#: installs of a git checkout would drag it in otherwise.
+_EXCLUDED_FROM_COPY = (".git", "__pycache__")
+
+_EXCLUDED_SUFFIXES = (".pyc", ".pyo")
+
+
+def _copy_ignore(directory, names):
+    """Names skip when copying a package (applies recursively)."""
+
+    skipped = set()
+
+    for name in names:
+
+        if name in _EXCLUDED_FROM_COPY or name.endswith(_EXCLUDED_SUFFIXES):
+            skipped.add(name)
+
+    return skipped
+
+
 def _copy_contents(source, target):
     for item in os.listdir(source):
         src = os.path.join(source, item)
         dest = os.path.join(target, item)
 
         if os.path.isdir(src):
-            shutil.copytree(src, dest)
+            shutil.copytree(src, dest, ignore=_copy_ignore)
         else:
             shutil.copy2(src, dest)
 
@@ -662,6 +684,7 @@ def info_package(name, base_path="."):
     print(f"  name         : {manifest.get('name', name)}")
     print(f"  version      : {manifest.get('version', '?')}")
     print(f"  type         : {package_type(manifest)}")
+    print(f"  entry        : {entry_file(manifest)}")
     print(f"  description  : {manifest.get('description', '-')}")
     print(f"  author       : {manifest.get('author', '-')}")
     print(f"  license      : {manifest.get('license', '-')}")

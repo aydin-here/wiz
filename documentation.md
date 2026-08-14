@@ -530,6 +530,7 @@ Fields:
 | `name` | yes | Package name, used as the install directory under `~/.wiz/packages/` |
 | `version` | yes | Semantic version, e.g. `"1.0.0"` |
 | `type` | no | `"wiz"` (default) or `"native"`; see [Package types](#package-types) |
+| `entry` | no | Entry file, relative to the package directory. Defaults to `main.wiz` (wiz) or `main.py` (native) |
 | `description` | no | Short human description |
 | `author` | no | Package author |
 | `license` | no | License identifier, e.g. `"MIT"` |
@@ -700,12 +701,43 @@ echo(hello_wiz.hello("Wiz"))      # -> Hello, Wiz!
 echo(hello_wiz.VERSION)           # -> 1.0.0
 ```
 
+Classes are imported the same way as functions: a class declared at the
+top level of the entry file is available as `module.ClassName(...)`, and
+functions in the module may instantiate the module's own classes by name:
+
+```wiz
+# main.wiz
+class Greeter {
+    let greeting = "Hi"
+    func init(name) { self.name = name }
+    func greet() { return self.greeting + ", " + self.name }
+}
+
+func make_greeter(name) { return Greeter(name) }
+```
+
+```wiz
+import hello_wiz
+
+let g = hello_wiz.make_greeter("Sam")   # -> Hi, Sam
+echo(hello_wiz.Greeter("Zoe").greet())  # -> Hi, Zoe
+```
+
 Notes:
 
 - `let VERSION` is **not required** — it is just a convention. Anything
   declared at the top level of `main.wiz` becomes part of the module.
-- The entry file is always `main.wiz`. `import hello_wiz` maps the
+- The entry file defaults to `main.wiz`. `import hello_wiz` maps the
   package name to `~/.wiz/packages/hello_wiz/main.wiz`.
+- The entry file can be relocated with the manifest `entry` field. Use it
+  to keep a clean source layout:
+
+```text
+widget/
+├── wiz.pkg          { "name": "widget", ..., "entry": "lib/widget.wiz" }
+└── lib/
+    └── widget.wiz   <- loaded when you `import widget`
+```
 - You may keep a package's runtime state in module variables; the module
   is loaded only once per execution, and module functions keep access to
   their module scope no matter how they are called.
@@ -744,6 +776,19 @@ func quadruple(n) {
 Helper files are **private** to the package: a project can `import
 bundle` but cannot `import util` from outside the package.
 
+If a helper file declares classes that should be part of the package's
+public API, re-export them from the entry file with a `let` alias:
+
+```wiz
+# main.wiz
+import util
+
+let double = util.double          # re-export a function
+```
+
+Classes and functions re-exported this way are callable through the
+package module like any other member.
+
 ---
 
 ## Writing a native package
@@ -757,6 +802,18 @@ hello_native/
 └── main.py
 ```
 
+The entry file defaults to `main.py`, but you can put it anywhere with
+the manifest `entry` field — this lets a native package keep a clean
+`src/` layout and import its own submodules:
+
+```text
+mybot/
+├── wiz.pkg          { "name": "mybot", ..., "type": "native", "entry": "src/bot.py" }
+└── src/
+    ├── bot.py       <- loaded when you `import mybot`
+    └── core.py      <- imported by bot.py
+```
+
 `wiz.pkg`:
 
 ```json
@@ -768,7 +825,7 @@ hello_native/
 }
 ```
 
-`main.py` **must** define a top-level variable named `module`. That
+The entry file **must** define a top-level variable named `module`. That
 object is what Wiz imports. It should expose at least a `functions`
 dictionary mapping Wiz function names to Python callables:
 
@@ -806,6 +863,30 @@ from:
 | `interpreter` | Set automatically by Wiz to the running interpreter, so a package can call back into Wiz. |
 
 At minimum `functions` is expected; `values` and `classes` are optional.
+
+Classes exposed via `classes` are used like Wiz classes: calling
+`module.ClassName(args)` builds the Python instance with `args` passed
+to its constructor, and the instance's Python methods are callable from
+Wiz:
+
+```python
+# render.py — a native package
+class Widget:
+    def __init__(self, name):
+        self.name = name
+
+    def describe(self):
+        return f"widget {self.name}"
+
+module = type("m", (), {"classes": {"Widget": Widget}})()
+```
+
+```wiz
+import render
+
+let w = render.Widget("submit")   # -> Widget.__init__("submit")
+echo(w.describe())                # -> widget submit
+```
 
 ### Calling conventions
 

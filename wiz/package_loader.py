@@ -8,6 +8,7 @@ from package import (
     PYTHON_ENTRY_FILE,
     load_manifest,
     package_type,
+    entry_file,
     is_python_package,
     check_wiz_version,
 )
@@ -93,12 +94,12 @@ class PackageLoader:
 
             if is_python_package(pkg_type):
 
-                entry = os.path.join(directory, PYTHON_ENTRY_FILE)
+                entry = os.path.join(directory, entry_file(manifest))
 
                 if not os.path.isfile(entry):
                     raise InvalidPackageManifestError(
                         f"Python package '{module}' is missing its entry "
-                        f"file '{PYTHON_ENTRY_FILE}' in '{directory}'",
+                        f"file '{entry_file(manifest)}' in '{directory}'",
                         path=manifest_file
                     )
 
@@ -111,12 +112,12 @@ class PackageLoader:
                     manifest_path=manifest_file,
                 )
 
-            entry = os.path.join(directory, WIZ_ENTRY_FILE)
+            entry = os.path.join(directory, entry_file(manifest))
 
             if not os.path.isfile(entry):
                 raise InvalidPackageManifestError(
                     f"Wiz package '{module}' is missing its entry "
-                    f"file '{WIZ_ENTRY_FILE}' in '{directory}'",
+                    f"file '{entry_file(manifest)}' in '{directory}'",
                     path=manifest_file
                 )
 
@@ -138,8 +139,9 @@ class PackageLoader:
 
         raise InvalidPackageManifestError(
             f"Package '{module}' has no '{MANIFEST_FILE}' manifest and no "
-            f"entry module in '{directory}'. Expected 'main.wiz' for a Wiz "
-            f"package or 'main.py' for a Python package.",
+            f"entry module in '{directory}'. Expected '{WIZ_ENTRY_FILE}' "
+            f"for a Wiz package or '{PYTHON_ENTRY_FILE}' for a Python "
+            f"package (or point 'entry' at the file in wiz.pkg).",
             path=directory
         )
 
@@ -163,14 +165,33 @@ class PackageLoader:
 
             python_module = importlib.util.module_from_spec(spec)
 
-            dont_write_bytecode = sys.dont_write_bytecode
-
-            sys.dont_write_bytecode = True
+            # Make the package importable so the entry script can import
+            # its own internal Python submodules, e.g. a main.py that does
+            # `import wiz_tk`. Both the package directory and the entry
+            # file's own directory are added; they are removed again once
+            # the module has been executed.
+            sys_path = list(sys.path)
 
             try:
-                spec.loader.exec_module(python_module)
+                if resolution.directory:
+                    sys.path.insert(0, resolution.directory)
+
+                entry_dir = os.path.dirname(resolution.entry)
+
+                if entry_dir and entry_dir != resolution.directory:
+                    sys.path.insert(0, entry_dir)
+
+                dont_write_bytecode = sys.dont_write_bytecode
+
+                sys.dont_write_bytecode = True
+
+                try:
+                    spec.loader.exec_module(python_module)
+                finally:
+                    sys.dont_write_bytecode = dont_write_bytecode
+
             finally:
-                sys.dont_write_bytecode = dont_write_bytecode
+                sys.path[:] = sys_path
 
         except PythonDependencyError:
             raise

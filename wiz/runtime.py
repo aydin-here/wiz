@@ -3,11 +3,11 @@ from nodes import FunctionStatement
 
 class Module:
 
-    def __init__(self, name, variables, functions):
+    def __init__(self, name, variables, functions, classes=None):
         self.name = name
         self.variables = variables
         self.functions = functions
-
+        self.classes = classes or {}
 
     def get(self, name):
 
@@ -16,7 +16,10 @@ class Module:
         if variable is not None:
             return variable["value"]
 
-        return self.functions.get(name)
+        if name in self.functions:
+            return self.functions[name]
+
+        return self.classes.get(name)
 
 
 class WizClass:
