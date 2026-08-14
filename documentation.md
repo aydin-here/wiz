@@ -483,9 +483,11 @@ Modules are loaded only once during execution.
 
 # Packages
 
-Packages are shareable libraries that you install into a project. They
-land in a `wiz_modules/` directory next to your code and are imported
-like any other module:
+Packages are shareable libraries that you install **globally**. They are
+stored in your Wiz home directory (`~/.wiz/packages`, overridable with
+the `WIZ_HOME` environment variable) and are available to **every
+project** on the machine, like Python's global site-packages rather than
+a per-project `venv`. They are imported like any other module:
 
 ```wiz
 import hello_wiz
@@ -503,8 +505,10 @@ Wiz code; only the manifest `type` and the entry file differ.
 ## The `wiz.pkg` manifest
 
 Every project *and* every package may carry a JSON manifest called
-`wiz.pkg`. A project manifest describes the project and its dependencies;
-a package manifest describes the package itself.
+`wiz.pkg`. A project manifest lists the dependencies the project wants;
+a package manifest describes the package itself. The project manifest is
+optional — you only need one if you want `wiz install` (with no
+arguments) to reinstall your declared dependencies.
 
 Example project manifest:
 
@@ -523,7 +527,7 @@ Fields:
 
 | Field | Required | Description |
 | ----- | -------- | ----------- |
-| `name` | yes | Package name, used as the install directory under `wiz_modules/` |
+| `name` | yes | Package name, used as the install directory under `~/.wiz/packages/` |
 | `version` | yes | Semantic version, e.g. `"1.0.0"` |
 | `type` | no | `"wiz"` (default) or `"native"`; see [Package types](#package-types) |
 | `description` | no | Short human description |
@@ -538,7 +542,8 @@ Fields:
 
 ## Installing packages
 
-Install every dependency listed in `wiz.pkg`:
+Install every dependency listed in the current project's `wiz.pkg` into
+the global store:
 
 ```bash
 python3 wiz/main.py install
@@ -557,17 +562,19 @@ Install a package from a local directory (offline):
 python3 wiz/main.py install ./packages/hello_wiz
 ```
 
-Packages are downloaded as GitHub tarballs, extracted into
-`wiz_modules/<name>/` and recorded in the project `wiz.pkg`. A package may
-declare its own dependencies, which are installed recursively into the
-same `wiz_modules/` directory. Reinstalling an already-installed package
-replaces it in place.
+Packages are downloaded as GitHub tarballs and extracted into
+`~/.wiz/packages/<name>/`. A package may declare its own dependencies,
+which are installed recursively into the same global store. A record of
+every installed package and its source spec is kept in
+`~/.wiz/packages.json`. Reinstalling an already-installed package
+replaces it in place. Installing never modifies the current project's
+files.
 
 ---
 
 ## Managing packages
 
-List installed packages with their version and type:
+List globally installed packages with their version and type:
 
 ```bash
 python3 wiz/main.py list
@@ -598,7 +605,7 @@ python3 wiz/main.py uninstall mylib
 ```
 
 Updating re-fetches each package from its latest (default) branch and
-removes any `@tag` pin from `wiz.pkg`.
+removes any `@tag` pin from the registry.
 
 ---
 
@@ -635,19 +642,19 @@ When you `import <name>`, the interpreter looks in this order:
 2. **Inside a module**, a sibling file in that module's own directory
    (`<module_dir>/<name>.wiz`). This is how a multi-file Wiz package
    imports its own helper files.
-3. **Local project module** — `./<name>.wiz`.
-4. **Legacy flat module** — `wiz_modules/<name>.wiz`.
-5. **Installed package** — `wiz_modules/<name>/`, loaded through its
+3. **Local project module** — `./<name>.wiz` next to the running program.
+4. **Legacy flat module** — `~/.wiz/packages/<name>.wiz`.
+5. **Installed package** — `~/.wiz/packages/<name>/`, loaded through its
    manifest: `main.wiz` for a Wiz package, `main.py` for a native one.
    A legacy directory without a manifest uses
-   `wiz_modules/<name>/<name>.wiz`.
+   `~/.wiz/packages/<name>/<name>.wiz`.
 
 ```text
 stdlib
 <current module dir>/<name>.wiz   (inside a module)
-<name>.wiz
-wiz_modules/<name>.wiz
-wiz_modules/<name>/main.wiz       (or main.py for a native package)
+<name>.wiz                        (local project module)
+~/.wiz/packages/<name>.wiz
+~/.wiz/packages/<name>/main.wiz   (or main.py for a native package)
 ```
 
 ---
@@ -698,7 +705,7 @@ Notes:
 - `let VERSION` is **not required** — it is just a convention. Anything
   declared at the top level of `main.wiz` becomes part of the module.
 - The entry file is always `main.wiz`. `import hello_wiz` maps the
-  package name to `wiz_modules/hello_wiz/main.wiz`.
+  package name to `~/.wiz/packages/hello_wiz/main.wiz`.
 - You may keep a package's runtime state in module variables; the module
   is loaded only once per execution, and module functions keep access to
   their module scope no matter how they are called.
@@ -836,8 +843,8 @@ the module can be imported. Install them with `pip`.)
 ## Dependencies between packages
 
 A package can depend on other packages. Dependencies may be GitHub specs
-or local relative paths. They are installed recursively, in the same
-`wiz_modules/` directory:
+or local relative paths. They are installed recursively, into the same
+global store (`~/.wiz/packages/`):
 
 ```json
 {

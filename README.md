@@ -655,23 +655,26 @@ import math
 math.sum(1,2)
 ```
 
-Modules are loaded from
+Modules are resolved in this order:
 
 ```
-module.wiz
-wiz_modules/module.wiz
-wiz_modules/module/module.wiz
+stdlib
+<current module dir>/<name>.wiz   (sibling file inside a module)
+<name>.wiz                         (local project module)
+~/.wiz/packages/<name>.wiz         (legacy flat global module)
+~/.wiz/packages/<name>/            (global package: main.wiz or main.py)
 ```
-
-inside the current project.
 
 ---
 
 # Package Manager
 
-Wiz can install packages directly from GitHub.
+Wiz installs packages globally into the user's Wiz home directory
+(`~/.wiz/packages`, overridable with the `WIZ_HOME` environment
+variable). Once installed, a package is available to every project on
+the machine.
 
-Install all dependencies from `wiz.pkg`:
+Install every dependency declared in the current project's `wiz.pkg`:
 
 ```bash
 python wiz/main.py install
@@ -684,6 +687,12 @@ python wiz/main.py install aydin-here/mylib
 python wiz/main.py install aydin-here/mylib@v1.0.0
 ```
 
+Install a package straight from a local directory (offline):
+
+```bash
+python wiz/main.py install ./packages/mylib
+```
+
 Remove, update and list packages:
 
 ```bash
@@ -691,15 +700,18 @@ python wiz/main.py uninstall mylib
 python wiz/main.py update
 python wiz/main.py update mylib
 python wiz/main.py list
+python wiz/main.py info mylib
 ```
 
 `wiz update` re-fetches every installed package from its latest
 (default) branch, dropping any `@tag` pin. `wiz update mylib` updates a
 single installed package by name.
 
-Installed packages are extracted into `wiz_modules/` and imported like
-any other module. Each package can declare a `wiz.pkg` manifest with a
-`name`, `version`, and `dependencies`, which are installed recursively.
+Installed packages live in `~/.wiz/packages/<name>/` and are imported
+like any other module. Each package declares a `wiz.pkg` manifest with a
+`name`, `version` and optional `type` (`"wiz"` by default, `"native"`
+for Python-backed packages). Dependencies are installed recursively into
+the same global store.
 
 ```wiz
 import mylib

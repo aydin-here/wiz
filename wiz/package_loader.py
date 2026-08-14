@@ -11,7 +11,7 @@ from package import (
     is_python_package,
     check_wiz_version,
 )
-from package_manager import MODULES_DIR
+from package_manager import packages_dir
 from runtime import NativeModule
 from errors import (
     InvalidPackageManifestError,
@@ -45,23 +45,19 @@ class PackageLoader:
 
     """Locates and loads external Wiz packages.
 
-    The loader searches a deterministic set of locations relative to the
-    running project:
-
-      1. Local project modules        base_path/<module>.wiz
-      2. Loose legacy modules         base_path/wiz_modules/<module>.wiz
-      3. Wiz packages                 base_path/wiz_modules/<module>/main.wiz
-      4. Python packages              base_path/wiz_modules/<module>/main.py
-
-    Built-in stdlib modules are resolved by the interpreter before this
-    loader is consulted, so external packages can never shadow them.
+    Installed packages are stored in a global store (~/.wiz/packages by
+    default, overridable with WIZ_HOME) and are therefore available to
+    every project. The loader also resolves project-local modules (a
+    ``<module>.wiz`` file next to the running program). Built-in stdlib
+    modules are resolved by the interpreter before this loader is
+    consulted, so external packages can never shadow them.
     """
 
     def __init__(self, base_path="."):
         self.base_path = base_path
 
     def package_dir(self):
-        return os.path.join(self.base_path, MODULES_DIR)
+        return packages_dir()
 
     def find(self, module):
         """Resolve a module name to a PackageResolution, or None."""

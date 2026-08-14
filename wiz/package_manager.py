@@ -25,12 +25,62 @@ GITHUB = "https://github.com"
 USER_AGENT = "wiz-package-manager"
 
 
+def wiz_home():
+    """Root of the global Wiz data directory (~/.wiz by default).
+
+    Override with the WIZ_HOME environment variable. Packages installed
+    here are available to every project on the machine.
+    """
+    return os.environ.get("WIZ_HOME") or os.path.join(
+        os.path.expanduser("~"),
+        ".wiz",
+    )
+
+
+def packages_dir():
+    """Directory where installed packages are stored (global store)."""
+    return os.path.join(wiz_home(), "packages")
+
+
+def registry_path():
+    """Path of the global package registry (package name -> source spec)."""
+    return os.path.join(wiz_home(), "packages.json")
+
+
+def load_registry():
+    """Read the global registry mapping package name to install spec."""
+
+    path = registry_path()
+
+    if not os.path.exists(path):
+        return {}
+
+    try:
+        with open(path, encoding="utf-8") as file:
+            data = json.load(file)
+    except (OSError, ValueError):
+        return {}
+
+    if not isinstance(data, dict):
+        return {}
+
+    return data
+
+
+def save_registry(registry):
+    os.makedirs(os.path.dirname(registry_path()), exist_ok=True)
+
+    with open(registry_path(), "w", encoding="utf-8") as file:
+        json.dump(registry, file, indent=4)
+        file.write("\n")
+
+
 def manifest_path(base_path="."):
     return os.path.join(base_path, MANIFEST_FILE)
 
 
 def modules_path(base_path="."):
-    return os.path.join(base_path, MODULES_DIR)
+    return packages_dir()
 
 
 def load_manifest(base_path="."):
@@ -366,11 +416,6 @@ def _install_spec(spec, base_path, visited, installed):
         if not os.path.isdir(spec):
             raise WizError(f"Local package path '{spec}' does not exist")
 
-        if spec in visited:
-            return
-
-        visited.add(spec)
-
         fallback = os.path.basename(os.path.abspath(spec))
 
         _install_extracted(
@@ -393,25 +438,28 @@ def _install_spec(spec, base_path, visited, installed):
 
 
 def install_package(spec, base_path="."):
+    """Install a package into the global store.
+
+    The package becomes available to every project. Only the global
+    registry is updated; the project's wiz.pkg is left untouched.
+    """
+
     visited = set()
     installed = {}
 
     _install_spec(spec, base_path, visited, installed)
 
-    manifest = load_manifest(base_path)
-
-    manifest["dependencies"].update(installed)
-
-    save_manifest(manifest, base_path)
-
-    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
+    registry = load_registry()
+    registry.update(installed)
+    save_registry(registry)
 
 
 def install_from_directory(source, base_path="."):
     """Install a package from a local directory without network access.
 
     The directory must contain a valid wiz.pkg manifest. Package files are
-    copied into wiz_modules/ and the dependency is recorded in wiz.pkg.
+    copied into the global package store and recorded in the global
+    registry, so the package is available to every project.
     """
 
     source = os.path.abspath(source)
@@ -429,16 +477,18 @@ def install_from_directory(source, base_path="."):
         installed
     )
 
-    project_manifest = load_manifest(base_path)
-
-    project_manifest["dependencies"].update(installed)
-
-    save_manifest(project_manifest, base_path)
-
-    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
+    registry = load_registry()
+    registry.update(installed)
+    save_registry(registry)
 
 
 def install_all(base_path="."):
+    """Install every dependency declared in the project's wiz.pkg.
+
+    This is a "restore" command: it reads the project manifest and makes
+    sure each dependency is available in the global store.
+    """
+
     manifest = load_manifest(base_path)
 
     dependencies = manifest.get("dependencies", {})
@@ -453,11 +503,9 @@ def install_all(base_path="."):
     for spec in dependencies.values():
         _install_spec(spec, base_path, visited, installed)
 
-    manifest["dependencies"].update(installed)
-
-    save_manifest(manifest, base_path)
-
-    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
+    registry = load_registry()
+    registry.update(installed)
+    save_registry(registry)
 
 
 def _unpin_spec(spec):
@@ -466,53 +514,51 @@ def _unpin_spec(spec):
 
 
 def update_package(name, base_path="."):
-    manifest = load_manifest(base_path)
+    registry = load_registry()
 
-    dependencies = manifest.get("dependencies", {})
+    if name in registry:
+        spec = registry[name]
+    else:
+        spec = load_manifest(base_path).get("dependencies", {}).get(name)
 
-    if name not in dependencies:
+    if not spec:
         raise WizError(
             f"Package '{name}' is not installed. "
             "Run 'wiz install <owner/repo>' first."
         )
 
-    spec = _unpin_spec(dependencies[name])
+    spec = _unpin_spec(spec)
 
     visited = set()
     installed = {}
 
     _install_spec(spec, base_path, visited, installed)
 
-    manifest["dependencies"].update(installed)
-
-    save_manifest(manifest, base_path)
-
-    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
+    registry.update(installed)
+    save_registry(registry)
 
 
 def update_all(base_path="."):
-    manifest = load_manifest(base_path)
+    registry = load_registry()
 
-    dependencies = manifest.get("dependencies", {})
-
-    if not dependencies:
-        print("No dependencies in wiz.pkg")
+    if not registry:
+        print("No packages installed")
         return
 
     visited = set()
     installed = {}
 
-    for spec in dependencies.values():
+    for spec in registry.values():
 
-        spec = _unpin_spec(spec)
+        try:
+            spec = _unpin_spec(spec)
+        except WizError:
+            continue
 
         _install_spec(spec, base_path, visited, installed)
 
-    manifest["dependencies"].update(installed)
-
-    save_manifest(manifest, base_path)
-
-    print(paint(f"  Updated {manifest_path(base_path)}", Color.CYAN))
+    registry.update(installed)
+    save_registry(registry)
 
 
 def uninstall_package(name, base_path="."):
@@ -520,7 +566,7 @@ def uninstall_package(name, base_path="."):
 
     target = os.path.join(modules_path(base_path), name)
 
-    manifest = load_manifest(base_path)
+    registry = load_registry()
 
     removed = False
 
@@ -528,9 +574,9 @@ def uninstall_package(name, base_path="."):
         shutil.rmtree(target)
         removed = True
 
-    if name in manifest["dependencies"]:
-        del manifest["dependencies"][name]
-        save_manifest(manifest, base_path)
+    if name in registry:
+        del registry[name]
+        save_registry(registry)
         removed = True
 
     if removed:
@@ -569,16 +615,22 @@ def list_packages(base_path="."):
 
     dependencies = manifest.get("dependencies", {})
 
+    registry = load_registry()
+
+    # Union of globally installed packages and the project's declared
+    # dependencies, so both stay visible.
+    names = sorted(set(registry) | set(dependencies))
+
     modules_dir = modules_path(base_path)
 
-    if not dependencies:
+    if not names:
         print("No packages installed")
         return
 
-    print("  Installed packages:")
+    print("  Installed packages (global):")
     print()
 
-    for name, spec in dependencies.items():
+    for name in names:
 
         directory = os.path.join(modules_dir, name)
 
