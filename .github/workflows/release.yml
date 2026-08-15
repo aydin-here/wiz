@@ -59,13 +59,18 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install PyInstaller
+      - name: Install PyInstaller and LSP deps
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
+          pip install pyinstaller pygls lsprotocol cattrs
 
       - name: Build
-        run: pyinstaller --onefile --name "${{ matrix.artifact }}" wiz/main.py
+        run: |
+          pyinstaller --onefile --name "${{ matrix.artifact }}" \
+            --collect-all pygls \
+            --collect-all lsprotocol \
+            --collect-all cattrs \
+            wiz/main.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

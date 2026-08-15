@@ -74,6 +74,7 @@ Commands:
     lint <file.wiz>               Statically analyze a Wiz file
     format <file.wiz>             Format a Wiz file (print to stdout)
     format <file.wiz> -w          Format and overwrite the file in place
+    lsp                          Start the language server (stdin/stdout)
     install [owner/repo[@tag]]    Install all dependencies or a package
     update [package]              Update all packages or a specific one
     -U, upgrade                   Update Wiz itself from GitHub
@@ -547,6 +548,20 @@ def main():
             return
         write = len(sys.argv) == 4 and sys.argv[3] in ("-w", "--write")
         format_file(sys.argv[2], write)
+        return
+
+    if command == "lsp":
+        try:
+            import pygls
+        except ImportError:
+            print(
+                "Error: the language server needs 'pygls'.\n"
+                "Install it with:  pip install pygls"
+            )
+            sys.exit(1)
+
+        from lsp import main as lsp_main
+        lsp_main()
         return
 
     if len(sys.argv) != 3:
