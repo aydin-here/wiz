@@ -25,7 +25,7 @@ from linter import Linter
 from formatter import Formatter
 from ui import Color, Spinner, download, paint, ssl_context, success
 
-VERSION = "0.24.4"
+VERSION = "1.24.4"
 BANNER = """__        ___     
 \ \      / (_)____
  \ \ /\ / /| |_  /
