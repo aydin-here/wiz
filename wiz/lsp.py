@@ -1,9 +1,11 @@
 import os
+import re
 
 from lsprotocol.types import (
     CompletionItem,
     CompletionItemKind,
     CompletionList,
+    CompletionOptions,
     Diagnostic,
     DiagnosticSeverity,
     DocumentSymbol,
@@ -33,7 +35,7 @@ KEYWORDS = [
     "return", "while", "for", "in", "step", "break", "continue",
     "class", "extends", "import", "decorator", "before", "after",
     "error", "try", "catch", "finally", "throw", "null", "and", "or",
-    "not", "true", "false",
+    "not", "true", "false", "if", "self", "range",
 ]
 
 BUILTINS = {
@@ -93,9 +95,35 @@ def module_names():
 
 MODULES = module_names()
 
+RE_MEMBER = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)?$")
 
 def _position(line, column):
     return Position(line=line - 1, character=column - 1)
+
+
+def _last_line(node, fallback):
+    if node is None:
+        return fallback
+
+    body = node.statements if isinstance(node, Block) else [node]
+    return max([getattr(statement, "line", fallback) for statement in body] + [fallback])
+
+
+def _subtree_max_line(node, fallback):
+    best = getattr(node, "line", fallback)
+
+    for value in vars(node).values():
+
+        if isinstance(value, Node):
+            best = max(best, _subtree_max_line(value, fallback))
+
+        elif isinstance(value, list):
+            for item in value:
+
+                if isinstance(item, Node):
+                    best = max(best, _subtree_max_line(item, fallback))
+
+    return best
 
 
 def _range(line, column):
@@ -141,6 +169,7 @@ class WizAnalyzer:
         self.source = source
         self.top = []
         self.by_name = {}
+        self._classes = []
 
         try:
             tokens = Lexer(source).tokenize()
@@ -183,6 +212,8 @@ class WizAnalyzer:
         for node in nodes:
 
             if isinstance(node, (LetStatement, VarStatement, ImportStatement)):
+                value = node.value if isinstance(node, (LetStatement, VarStatement)) else None
+                inferred = value.name if isinstance(value, CallExpression) else None
                 self._register(_Symbol(
                     node.module if isinstance(node, ImportStatement) else node.name,
                     "let" if isinstance(node, LetStatement) else
@@ -190,6 +221,7 @@ class WizAnalyzer:
                     node.line,
                     node.column,
                     parent=parent,
+                    type=inferred,
                 ))
 
             elif isinstance(node, FunctionStatement):
@@ -237,6 +269,11 @@ class WizAnalyzer:
 
                     symbol.extra.setdefault("members", []).append(member_symbol)
                     self.by_name.setdefault(member.name, member_symbol)
+
+                block = node.body
+                end = _subtree_max_line(node.body, node.line) + 1
+
+                self._classes.append((node.line, end, symbol))
 
                 self._walk(node.body, parent=symbol)
 
@@ -315,6 +352,14 @@ class WizAnalyzer:
 
     def definition(self, name):
         return self.by_name.get(name)
+
+    def definition_at(self, line, column):
+        for start, end, symbol in reversed(self._classes):
+
+            if start <= line + 1 <= end:
+                return symbol
+
+        return None
 
 
 class WizLanguageServer(LanguageServer):
@@ -416,6 +461,15 @@ class WizLanguageServer(LanguageServer):
         doc = self.workspace.get_text_document(params.text_document.uri)
         analyzer = self._analyze(doc.uri, doc.source)
 
+        lines = doc.source.splitlines()
+        line = params.position.line
+
+        if line < len(lines):
+            text = lines[line][: params.position.character]
+
+            if text.rstrip().endswith("."):
+                return self._member_completion(analyzer, text.rstrip(), params)
+
         word = analyzer.word_at(
             params.position.line, params.position.character
         )
@@ -447,7 +501,8 @@ class WizLanguageServer(LanguageServer):
                     kind=COMPLETION_KIND.get(
                         symbol.kind, CompletionItemKind.Variable
                     ),
-                    detail=symbol.kind,
+                    detail=symbol.signature() if symbol.kind == "function" else
+                    ("class" if symbol.kind == "class" else symbol.kind),
                 ))
 
         for module in MODULES:
@@ -470,6 +525,62 @@ class WizLanguageServer(LanguageServer):
             unique.append(item)
 
         return CompletionList(is_incomplete=False, items=unique)
+
+    def _member_completion(self, analyzer, text, params):
+        match = RE_MEMBER.search(text)
+        items = []
+
+        if not match:
+            return None
+
+        expr, name = match.group(1), match.group(2) or ""
+
+        if expr == "self":
+            members = self._class_members_under(analyzer, params.position)
+        else:
+            symbol = analyzer.definition(expr)
+            members = None
+
+            if symbol is not None:
+                if symbol.kind in ("class",):
+                    members = symbol.extra.get("members")
+                else:
+                    type_name = symbol.extra.get("type")
+
+                    if type_name:
+                        type_symbol = analyzer.definition(type_name)
+
+                        if type_symbol is not None:
+                            members = type_symbol.extra.get("members")
+
+        if not members:
+            return None
+
+        for member in members:
+
+            if member.kind == "param":
+                continue
+
+            if not member.name.startswith(name):
+                continue
+
+            items.append(CompletionItem(
+                label=member.name,
+                kind=COMPLETION_KIND.get(
+                    member.kind, CompletionItemKind.Field
+                ),
+                detail=member.signature() if member.kind == "function" else "property",
+            ))
+
+        return CompletionList(is_incomplete=False, items=items)
+
+    def _class_members_under(self, analyzer, position):
+        symbol = analyzer.definition_at(position.line, position.character)
+
+        if symbol is None or symbol.kind != "class":
+            return None
+
+        return symbol.extra.get("members")
 
     def feature_symbols(self, params):
         doc = self.workspace.get_text_document(params.text_document.uri)
@@ -543,7 +654,11 @@ class WizLanguageServer(LanguageServer):
             return Hover(
                 contents=MarkupContent(
                     kind=MarkupKind.Markdown,
-                    value=f"```wiz\n{symbol.signature()}\n```",
+                    value=(
+                        f"```wiz\n{symbol.signature()}\n```\n\n"
+                        f"This **{symbol.kind}** is defined on "
+                        f"line **{symbol.line}**."
+                    ),
                 )
             )
 
@@ -553,8 +668,17 @@ class WizLanguageServer(LanguageServer):
                     kind=MarkupKind.Markdown,
                     value=(
                         f"```wiz\n{word['word']}()\n```\n\n"
-                        f"{BUILTINS[word['word']]}"
+                        f"{BUILTINS[word['word']]}\n\n"
+                        f"*built-in function*"
                     ),
+                )
+            )
+
+        if word["word"] in KEYWORDS:
+            return Hover(
+                contents=MarkupContent(
+                    kind=MarkupKind.Markdown,
+                    value=f"```wiz\n{word['word']}\n```\n\n*keyword*",
                 )
             )
 
@@ -589,7 +713,10 @@ def definition(ls, params):
     return ls.feature_definition(params)
 
 
-@SERVER.feature("textDocument/completion")
+@SERVER.feature(
+    "textDocument/completion",
+    CompletionOptions(trigger_characters=[".", ":"], resolve_provider=False),
+)
 def completion(ls, params):
     return ls.feature_completion(params)
 
